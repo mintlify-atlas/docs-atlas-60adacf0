@@ -1,0 +1,172 @@
+{
+  "projectType": "saas",
+  "projectName": "HAPI",
+  "projectDescription": "Local-first platform for running AI coding agents with remote control via web, PWA, and Telegram",
+  "theme": "aspen",
+  "primaryColor": "#2563eb",
+  "lightColor": "#3b82f6",
+  "darkColor": "#1e40af",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/how-it-works",
+              "concepts/sessions",
+              "concepts/agents"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/remote-control",
+              "features/pwa",
+              "features/telegram",
+              "features/voice-assistant",
+              "features/terminal",
+              "features/permissions"
+            ]
+          },
+          {
+            "group": "Agents",
+            "pages": [
+              "agents/claude-code",
+              "agents/codex",
+              "agents/cursor-agent",
+              "agents/gemini",
+              "agents/opencode"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/relay",
+              "deployment/self-hosted",
+              "deployment/cloudflare-tunnel",
+              "deployment/tailscale"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/namespaces",
+              "advanced/runner",
+              "advanced/worktrees",
+              "advanced/configuration"
+            ]
+          },
+          {
+            "group": "Resources",
+            "pages": [
+              "resources/faq",
+              "resources/troubleshooting",
+              "resources/why-hapi"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "CLI Reference",
+        "groups": [
+          {
+            "group": "Commands",
+            "pages": [
+              "cli/overview",
+              "cli/session-commands",
+              "cli/auth-commands",
+              "cli/runner-commands",
+              "cli/hub-command",
+              "cli/diagnostics"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "cli/environment-variables",
+              "cli/settings-file"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/introduction",
+              "api/authentication"
+            ]
+          },
+          {
+            "group": "REST API",
+            "pages": [
+              "api/sessions",
+              "api/messages",
+              "api/permissions",
+              "api/machines",
+              "api/git-files",
+              "api/voice",
+              "api/push-notifications"
+            ]
+          },
+          {
+            "group": "WebSocket API",
+            "pages": [
+              "api/socket-overview",
+              "api/socket-events",
+              "api/rpc"
+            ]
+          },
+          {
+            "group": "Server-Sent Events",
+            "pages": [
+              "api/sse"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multi-agent support (Claude Code, Codex, Cursor Agent, Gemini, OpenCode)",
+    "Seamless local/remote session handoff",
+    "Web PWA with real-time updates",
+    "Telegram Mini App integration",
+    "Voice assistant control",
+    "Remote terminal access",
+    "Permission management system",
+    "Git integration and file browser",
+    "Background runner for long-running sessions",
+    "End-to-end encrypted relay with WireGuard"
+  ],
+  "publicApiSurface": [
+    "hapi (start Claude Code session)",
+    "hapi codex (start Codex session)",
+    "hapi cursor (start Cursor Agent session)",
+    "hapi gemini (start Gemini session)",
+    "hapi opencode (start OpenCode session)",
+    "hapi hub (start hub server)",
+    "hapi auth login/logout/status",
+    "hapi runner start/stop/status",
+    "hapi doctor",
+    "POST /api/auth (authentication)",
+    "GET /api/sessions (list sessions)",
+    "POST /api/sessions/:id/messages (send message)",
+    "GET /api/events (SSE stream)",
+    "Socket.IO /cli namespace events",
+    "RPC methods for remote control"
+  ]
+}
