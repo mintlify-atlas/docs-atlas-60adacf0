@@ -1,0 +1,202 @@
+---
+title: Messages
+description: Send and retrieve messages
+---
+
+## GET /api/sessions/:id/messages
+
+Get paginated messages for a session.
+
+**Authentication:** Required
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Session ID
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="limit" type="number" default="50">
+  Number of messages to return (1-200)
+</ParamField>
+
+<ParamField query="beforeSeq" type="number" optional>
+  Return messages before this sequence number (for pagination)
+</ParamField>
+
+### Response
+
+<ResponseField name="messages" type="array">
+  Array of messages in reverse chronological order
+  <Expandable title="Message properties">
+    <ResponseField name="id" type="string">
+      Message ID
+    </ResponseField>
+    <ResponseField name="seq" type="number">
+      Sequence number
+    </ResponseField>
+    <ResponseField name="localId" type="string" optional>
+      Client-provided local ID
+    </ResponseField>
+    <ResponseField name="content" type="any">
+      Message content (varies by message type)
+    </ResponseField>
+    <ResponseField name="createdAt" type="number">
+      Unix timestamp (ms) when message was created
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="hasMore" type="boolean">
+  Whether there are more messages available
+</ResponseField>
+
+### Example
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  "http://127.0.0.1:3006/api/sessions/abc123/messages?limit=20"
+```
+
+```json
+{
+  "messages": [
+    {
+      "id": "msg_xyz789",
+      "seq": 42,
+      "content": {
+        "type": "text",
+        "text": "Hello from the agent"
+      },
+      "createdAt": 1709856000000
+    },
+    {
+      "id": "msg_abc456",
+      "seq": 41,
+      "localId": "local-123",
+      "content": {
+        "type": "text",
+        "text": "User message"
+      },
+      "createdAt": 1709855000000
+    }
+  ],
+  "hasMore": true
+}
+```
+
+### Pagination
+
+To fetch older messages, use the `beforeSeq` parameter with the lowest `seq` from the current page:
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  "http://127.0.0.1:3006/api/sessions/abc123/messages?limit=20&beforeSeq=41"
+```
+
+### Errors
+
+- `403` - Access denied (session belongs to different namespace)
+- `404` - Session not found
+- `503` - Hub not connected
+
+---
+
+## POST /api/sessions/:id/messages
+
+Send a message to an active session.
+
+**Authentication:** Required
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Session ID
+</ParamField>
+
+### Request Body
+
+<ParamField body="text" type="string" required>
+  Message text (required if no attachments)
+</ParamField>
+
+<ParamField body="localId" type="string" optional>
+  Client-generated ID for optimistic updates
+</ParamField>
+
+<ParamField body="attachments" type="array" optional>
+  Array of attachment metadata objects
+  <Expandable title="Attachment properties">
+    <ParamField body="id" type="string" required>
+      Attachment ID
+    </ParamField>
+    <ParamField body="filename" type="string" required>
+      Filename
+    </ParamField>
+    <ParamField body="mimeType" type="string" required>
+      MIME type
+    </ParamField>
+    <ParamField body="size" type="number" required>
+      File size in bytes
+    </ParamField>
+    <ParamField body="path" type="string" required>
+      Path to uploaded file
+    </ParamField>
+    <ParamField body="previewUrl" type="string" optional>
+      Preview URL for images
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Response
+
+```json
+{"ok": true}
+```
+
+### Example: Text Message
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Please add a new feature",
+    "localId": "local-456"
+  }' \
+  http://127.0.0.1:3006/api/sessions/abc123/messages
+```
+
+### Example: Message with Attachment
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Here is the design",
+    "attachments": [
+      {
+        "id": "att_123",
+        "filename": "design.png",
+        "mimeType": "image/png",
+        "size": 102400,
+        "path": "/tmp/hapi-upload-abc123-design.png"
+      }
+    ]
+  }' \
+  http://127.0.0.1:3006/api/sessions/abc123/messages
+```
+
+### Errors
+
+- `400` - Invalid body or missing text/attachments
+- `403` - Access denied
+- `404` - Session not found
+- `409` - Session not active
+- `503` - Hub not connected
+
+### Message Flow
+
+1. **Upload file** (if needed): `POST /api/sessions/:id/upload`
+2. **Send message**: `POST /api/sessions/:id/messages` with attachment metadata
+3. **Receive response**: Agent processes and responds via WebSocket/SSE

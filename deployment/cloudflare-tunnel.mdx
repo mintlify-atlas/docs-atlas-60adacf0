@@ -1,0 +1,314 @@
+---
+title: Cloudflare Tunnel
+description: Deploy HAPI with Cloudflare Tunnel for secure remote access without exposing ports
+---
+
+Cloudflare Tunnel creates a secure, outbound-only connection from your server to Cloudflare's network, eliminating the need for public IP addresses or port forwarding.
+
+## Why Cloudflare Tunnel?
+
+<CardGroup cols={2}>
+  <Card title="No port forwarding" icon="network-wired">
+    Works without opening firewall ports or configuring NAT
+  </Card>
+
+  <Card title="DDoS protection" icon="shield">
+    Cloudflare's network protects against DDoS attacks
+  </Card>
+
+  <Card title="Free HTTPS" icon="lock">
+    Automatic SSL/TLS certificates with no configuration
+  </Card>
+
+  <Card title="Custom domain" icon="globe">
+    Use your own domain for professional access
+  </Card>
+</CardGroup>
+
+<Warning>
+  **Important:** Do not use Cloudflare Quick Tunnels (TryCloudflare). They [do not support Server-Sent Events (SSE)](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/), which HAPI requires for real-time updates. Use a **Named Tunnel** instead.
+</Warning>
+
+## Prerequisites
+
+- Cloudflare account (free tier works)
+- Domain managed by Cloudflare DNS
+- `cloudflared` CLI installed
+
+## Setup
+
+<Steps>
+  <Step title="Install cloudflared">
+    Download from [Cloudflare downloads page](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/):
+
+    ```bash
+    # macOS
+    brew install cloudflared
+
+    # Linux (Debian/Ubuntu)
+    wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+    sudo dpkg -i cloudflared-linux-amd64.deb
+
+    # Other platforms: see Cloudflare docs
+    ```
+  </Step>
+
+  <Step title="Authenticate with Cloudflare">
+    ```bash
+    cloudflared tunnel login
+    ```
+
+    This opens a browser to authenticate with your Cloudflare account.
+  </Step>
+
+  <Step title="Create a named tunnel">
+    ```bash
+    cloudflared tunnel create hapi
+    ```
+
+    Save the tunnel ID displayed (needed for configuration).
+  </Step>
+
+  <Step title="Configure DNS">
+    Route a subdomain to your tunnel:
+
+    ```bash
+    cloudflared tunnel route dns hapi hapi.yourdomain.com
+    ```
+  </Step>
+
+  <Step title="Create tunnel configuration">
+    Create `~/.cloudflared/config.yml`:
+
+    ```yaml
+    tunnel: <your-tunnel-id>
+    credentials-file: /home/username/.cloudflared/<your-tunnel-id>.json
+
+    ingress:
+      - hostname: hapi.yourdomain.com
+        service: http://localhost:3006
+      - service: http_status:404
+    ```
+
+    Replace `<your-tunnel-id>` with the ID from step 3.
+  </Step>
+
+  <Step title="Start HAPI hub">
+    ```bash
+    export HAPI_PUBLIC_URL="https://hapi.yourdomain.com"
+    hapi hub
+    ```
+
+    The hub starts on `http://localhost:3006`.
+  </Step>
+
+  <Step title="Start Cloudflare Tunnel">
+    ```bash
+    cloudflared tunnel --protocol http2 run hapi
+    ```
+
+    <Note>
+      Use `--protocol http2` instead of QUIC (the default) to avoid timeout issues with long-lived SSE connections.
+    </Note>
+  </Step>
+
+  <Step title="Access your hub">
+    Open `https://hapi.yourdomain.com` in your browser.
+  </Step>
+</Steps>
+
+## Configuration
+
+### HAPI environment variables
+
+```bash
+export HAPI_PUBLIC_URL="https://hapi.yourdomain.com"
+export HAPI_LISTEN_HOST=127.0.0.1  # Keep localhost for security
+export HAPI_LISTEN_PORT=3006
+hapi hub
+```
+
+### Cloudflare Tunnel config.yml
+
+Advanced example with multiple services:
+
+```yaml
+tunnel: <your-tunnel-id>
+credentials-file: /home/username/.cloudflared/<your-tunnel-id>.json
+
+ingress:
+  # HAPI hub
+  - hostname: hapi.yourdomain.com
+    service: http://localhost:3006
+    originRequest:
+      noTLSVerify: false
+      connectTimeout: 30s
+      keepAliveTimeout: 90s
+
+  # Catch-all rule (required)
+  - service: http_status:404
+```
+
+<Note>
+  The catch-all rule (`http_status:404`) is required as the last entry.
+</Note>
+
+## Run as background service
+
+### Using systemd (Linux)
+
+Create `/etc/systemd/system/cloudflared.service`:
+
+```ini
+[Unit]
+Description=Cloudflare Tunnel
+After=network.target
+
+[Service]
+Type=simple
+User=username
+ExecStart=/usr/local/bin/cloudflared tunnel --protocol http2 run hapi
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+
+```bash
+sudo systemctl enable cloudflared
+sudo systemctl start cloudflared
+sudo systemctl status cloudflared
+```
+
+### Using pm2
+
+```bash
+pm2 start "cloudflared tunnel --protocol http2 run hapi" --name cloudflared
+pm2 start "hapi hub" --name hapi-hub
+pm2 save
+pm2 startup
+```
+
+### Using macOS launchd
+
+Create `~/Library/LaunchAgents/com.cloudflare.tunnel.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.cloudflare.tunnel</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/cloudflared</string>
+        <string>tunnel</string>
+        <string>--protocol</string>
+        <string>http2</string>
+        <string>run</string>
+        <string>hapi</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+</dict>
+</plist>
+```
+
+Load the service:
+
+```bash
+launchctl load ~/Library/LaunchAgents/com.cloudflare.tunnel.plist
+```
+
+## Telegram integration
+
+With Cloudflare Tunnel providing HTTPS, you can enable Telegram Mini App:
+
+```bash
+export TELEGRAM_BOT_TOKEN="your-bot-token"
+export HAPI_PUBLIC_URL="https://hapi.yourdomain.com"
+hapi hub
+```
+
+See [Telegram Setup](/installation#telegram-setup) for details.
+
+## Troubleshooting
+
+### Tunnel connects but web app doesn't load
+
+1. Verify `HAPI_PUBLIC_URL` matches your tunnel hostname exactly
+2. Check tunnel is using `--protocol http2` (not QUIC)
+3. Ensure HAPI hub is running on port 3006
+4. Test locally: `curl http://localhost:3006/api/health`
+
+### SSE not working / Real-time updates failing
+
+1. Confirm you're using a **Named Tunnel**, not Quick Tunnel (TryCloudflare)
+2. Add to `config.yml` under `originRequest`:
+   ```yaml
+   keepAliveTimeout: 90s
+   noHappyEyeballs: true
+   ```
+3. Use `--protocol http2` when starting tunnel
+
+### DNS not resolving
+
+1. Verify DNS record created: `cloudflared tunnel route dns hapi hapi.yourdomain.com`
+2. Check Cloudflare dashboard → DNS → Records
+3. DNS propagation can take a few minutes
+
+### Connection timeouts
+
+1. Increase timeout in `config.yml`:
+   ```yaml
+   originRequest:
+     connectTimeout: 60s
+     keepAliveTimeout: 120s
+   ```
+2. Ensure no firewall blocking localhost:3006
+
+## Comparison with relay
+
+| Feature | Relay | Cloudflare Tunnel |
+|---------|-------|-------------------|
+| **Setup complexity** | One command | Initial setup required |
+| **Custom domain** | No | Yes |
+| **Encryption** | WireGuard + TLS | TLS via Cloudflare |
+| **Latency** | Direct peer-to-peer | Through Cloudflare network |
+| **Cost** | Free | Free (Cloudflare Free tier) |
+| **DDoS protection** | No | Yes |
+| **Configuration** | Zero | Tunnel config + DNS |
+
+## When to use Cloudflare Tunnel
+
+Ideal when you:
+
+- Want a custom domain (e.g., `hapi.yourcompany.com`)
+- Need DDoS protection and Cloudflare features
+- Have a Cloudflare account and domain
+- Prefer managed infrastructure over relay
+- Want team access with consistent URL
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Telegram Setup" icon="paper-plane" href="/installation#telegram-setup">
+    Enable Telegram Mini App (now that you have HTTPS)
+  </Card>
+
+  <Card title="Runner Setup" icon="play" href="/installation#runner-setup">
+    Configure background runner for remote sessions
+  </Card>
+</CardGroup>
+
+## Resources
+
+- [Cloudflare Tunnel Documentation](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+- [cloudflared Downloads](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
+- [Tunnel Configuration Reference](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/configure-tunnels/local-management/configuration-file/)

@@ -1,0 +1,213 @@
+---
+title: Gemini
+description: Run Google Gemini coding sessions via ACP with HAPI
+---
+
+## Overview
+
+Gemini mode integrates Google's Gemini AI model with HAPI through the Anthropic Code Plugins (ACP) protocol. Run Gemini-powered coding sessions with remote control via web and Telegram.
+
+<Info>
+  Gemini runs in **remote mode only** - it waits for messages from the hub UI or Telegram.
+</Info>
+
+## Requirements
+
+- HAPI CLI installed (`hapi` command available)
+- Authenticated with HAPI hub (`hapi auth login`)
+- Google Gemini API credentials configured
+
+## Starting a Session
+
+### Basic Usage
+
+```bash
+hapi gemini              # Start Gemini session (remote mode)
+```
+
+### With Options
+
+```bash
+hapi gemini --yolo              # Bypass approval prompts
+hapi gemini --model gemini-pro  # Specify model
+```
+
+<Warning>
+  Gemini sessions run in remote mode only. You must control them from the web UI or Telegram.
+</Warning>
+
+## Available Flags
+
+| Flag | Description |
+|------|-------------|
+| `--yolo` | Bypass approval prompts |
+| `--model <model>` | Specify Gemini model (e.g., gemini-pro, gemini-ultra) |
+| `--hapi-starting-mode` | Must be `remote` (default behavior) |
+| `--started-by` | Internal flag for runner management |
+
+## Permission Modes
+
+Gemini supports these permission modes:
+
+<CardGroup cols={2}>
+  <Card title="Default" icon="shield-check">
+    Standard behavior with approval prompts
+  </Card>
+  <Card title="Read Only" icon="eye">
+    Only read operations allowed, no modifications
+  </Card>
+  <Card title="Safe Yolo" icon="shield-halved">
+    Some restrictions bypassed, critical checks remain
+  </Card>
+  <Card title="Yolo" icon="triangle-exclamation">
+    Bypass all approval prompts (use with caution)
+  </Card>
+</CardGroup>
+
+Change permission modes from the web UI during an active session.
+
+See `shared/src/modes.ts:7-8` for mode definitions.
+
+## Session Modes
+
+### Remote Mode Only
+
+Gemini runs exclusively in remote mode:
+
+```bash
+hapi gemini
+```
+
+In remote mode:
+- Session waits for messages from hub UI/Telegram
+- No terminal interaction
+- Fully controlled via web app or phone
+- Uses ACP (Anthropic Code Plugins) protocol
+
+<Info>
+  Local mode is not supported for Gemini. All interaction happens through the web UI or Telegram.
+</Info>
+
+## ACP Integration
+
+Gemini integrates via the ACP (Anthropic Code Plugins) protocol:
+
+- Runs as an ACP-compatible agent
+- Supports standard coding tools and operations
+- Managed by the HAPI agent runner system
+- See `cli/src/agent/runners/runAgentSession.ts` for implementation
+
+## Examples
+
+### Start Gemini Session
+
+```bash
+hapi gemini
+```
+
+Then control from the web UI or Telegram.
+
+### Start with Yolo Mode
+
+```bash
+hapi gemini --yolo
+```
+
+<Warning>
+  Yolo mode bypasses approval prompts. Use only in trusted environments.
+</Warning>
+
+### Specify Model
+
+```bash
+hapi gemini --model gemini-pro
+```
+
+### Start from Runner
+
+Gemini sessions can be spawned remotely via the HAPI runner:
+
+```bash
+hapi runner start
+```
+
+Then start a Gemini session from the web UI. The runner will spawn it on your machine.
+
+## Integration
+
+Once running, your Gemini session appears in:
+- HAPI web app
+- Telegram Mini App
+
+You can:
+- Send messages from web or phone
+- Monitor session activity in real-time
+- Approve operations remotely
+- Change permission modes on the fly
+- View file changes and diffs
+- Manage multiple sessions
+
+## Workflow
+
+1. **Start Session**
+   ```bash
+   hapi gemini
+   ```
+
+2. **Open Web UI**
+   - Navigate to your HAPI hub URL
+   - Find the new Gemini session
+
+3. **Send Messages**
+   - Type your coding request
+   - Gemini processes and responds
+   - Approve any required operations
+
+4. **Monitor Progress**
+   - View real-time updates
+   - Check file changes
+   - Review diffs
+
+## Remote Control
+
+Since Gemini runs in remote mode, you have full control from:
+
+### Web App
+- Send messages
+- Approve operations
+- View session history
+- Change modes
+- Monitor file changes
+
+### Telegram
+- Start/stop sessions
+- Send messages
+- Receive notifications
+- Quick approvals
+
+## Related Commands
+
+```bash
+hapi auth status        # Check authentication
+hapi runner start       # Start background service
+hapi runner status      # View runner status
+hapi runner list        # List active sessions
+hapi doctor             # Run diagnostics
+```
+
+## Configuration
+
+Gemini requires API credentials. Configure via:
+
+- Environment variables
+- HAPI configuration file
+- Hub settings
+
+See your HAPI hub documentation for specific configuration options.
+
+## Source Reference
+
+- Command implementation: `cli/src/commands/gemini.ts`
+- Session runner: `cli/src/gemini/runGemini.ts`
+- Agent runner: `cli/src/agent/runners/runAgentSession.ts`
+- Permission modes: `shared/src/modes.ts:7-8`

@@ -1,80 +1,353 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get HAPI running in under 2 minutes
 ---
 
-## Get started in three steps
+This guide will get you from zero to a working HAPI session with remote access in under 2 minutes.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+You need at least one AI agent CLI installed:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+<CodeGroup>
+```bash Claude Code (Recommended)
+claude --version
+```
 
-### Step 2: Deploy your changes
+```bash OpenCode
+opencode --version
+```
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+```bash Cursor Agent
+agent --version
+```
+</CodeGroup>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  Don't have an AI agent CLI? Install Claude Code with:
+  ```bash
+  npm install -g @anthropic-ai/claude-code
+  ```
 </Note>
+
+## Installation
+
+<Steps>
+  <Step title="Install HAPI">
+    Choose your preferred installation method:
+    
+    <CodeGroup>
+    ```bash npm
+    npm install -g @twsxtd/hapi --registry=https://registry.npmjs.org
+    ```
+    
+    ```bash Homebrew
+    brew install tiann/tap/hapi
+    ```
+    
+    ```bash npx (no install)
+    npx @twsxtd/hapi hub --relay
+    ```
+    </CodeGroup>
+    
+    <Note>
+      **Tip**: Use the official npm registry for global install. Some mirrors may not sync platform packages in time.
+    </Note>
+  </Step>
+  
+  <Step title="Start the Hub">
+    Run the hub with the public relay for instant remote access:
+    
+    ```bash
+    hapi hub --relay
+    ```
+    
+    You'll see output like this:
+    
+    ```
+    ┌─────────────────────────────────────────────────────────┐
+    │                                                         │
+    │   HAPI Hub Started                                      │
+    │                                                         │
+    │   Local:   http://localhost:3006                        │
+    │   Remote:  https://abc123.relay.hapi.run                │
+    │                                                         │
+    │   Access Token: hapi_1a2b3c4d5e6f...                    │
+    │                                                         │
+    │   [QR CODE DISPLAYED HERE]                              │
+    │                                                         │
+    └─────────────────────────────────────────────────────────┘
+    ```
+    
+    <Warning>
+      **Save your access token!** It's automatically saved to `~/.hapi/settings.json`, but you'll need it to log in from your phone.
+    </Warning>
+    
+    <Note>
+      The `--relay` flag enables end-to-end encrypted remote access via WireGuard + TLS. Your data is encrypted from your device to your machine—the relay only forwards packets it cannot read.
+    </Note>
+  </Step>
+  
+  <Step title="Start a Session">
+    Open a new terminal and start your first coding session:
+    
+    ```bash
+    hapi
+    ```
+    
+    This starts a Claude Code session wrapped with HAPI. You'll see the familiar Claude Code interface:
+    
+    ```
+    ┌─────────────────────────────────────────────────────────┐
+    │  Claude Code (powered by HAPI)                          │
+    │                                                         │
+    │  Session registered: session_abc123                    │
+    │  Project: /Users/you/projects/myapp                     │
+    │                                                         │
+    │  You: _                                                 │
+    └─────────────────────────────────────────────────────────┘
+    ```
+    
+    Your session is now active and visible in the web UI.
+  </Step>
+  
+  <Step title="Access from Your Phone">
+    Three ways to access:
+    
+    **Option 1: Scan QR Code**
+    
+    Use your phone's camera to scan the QR code displayed in the hub terminal.
+    
+    **Option 2: Open URL**
+    
+    Visit the remote URL shown in the hub output (e.g., `https://abc123.relay.hapi.run`).
+    
+    **Option 3: Copy to Phone**
+    
+    Send the URL to yourself via text/email/Slack and open it.
+    
+    ---
+    
+    **Login**: Enter the access token when prompted. It's saved in `~/.hapi/settings.json` if you need to retrieve it:
+    
+    ```bash
+    cat ~/.hapi/settings.json | grep cliApiToken
+    ```
+  </Step>
+  
+  <Step title="Control Remotely">
+    Once logged in, you'll see your active session. Try these features:
+    
+    **Send a Message**
+    
+    Type a message to your AI agent directly from your phone:
+    
+    ```
+    "Create a new React component called Button"
+    ```
+    
+    **Approve Permissions**
+    
+    When the AI requests file access, you'll get a notification. Tap to approve or deny.
+    
+    **View Files**
+    
+    Tap the "Files" tab to browse your project, view git status, and see diffs.
+    
+    **Switch Modes**
+    
+    - **Local → Remote**: Send a message from your phone
+    - **Remote → Local**: Press space twice in your terminal
+  </Step>
+</Steps>
+
+## What You Just Built
+
+Congratulations! You now have:
+
+<CardGroup cols={2}>
+  <Card title="Local AI Agent" icon="terminal">
+    Claude Code running in your terminal with full functionality
+  </Card>
+  <Card title="Remote Control" icon="mobile">
+    Web/PWA access from any device via encrypted relay
+  </Card>
+  <Card title="Session Persistence" icon="database">
+    All messages and state saved in SQLite (`~/.hapi/hapi.db`)
+  </Card>
+  <Card title="Real-Time Sync" icon="arrows-rotate">
+    Instant updates between terminal and phone via Socket.IO + SSE
+  </Card>
+</CardGroup>
+
+## Try Different Agents
+
+HAPI supports multiple AI agents. Try switching:
+
+<CodeGroup>
+```bash Claude Code (Default)
+hapi
+```
+
+```bash OpenAI Codex
+hapi codex
+```
+
+```bash Cursor Agent
+hapi cursor
+```
+
+```bash Google Gemini
+hapi gemini
+```
+
+```bash OpenCode
+hapi opencode
+```
+</CodeGroup>
+
+Each agent has the same remote control capabilities.
+
+## Common First-Time Tasks
+
+### Enable Notifications
+
+When prompted in the web app, click "Allow" to enable push notifications. You'll get notified when:
+- AI requests permissions
+- Sessions complete
+- Errors occur
+
+### Install as PWA
+
+On mobile:
+1. Tap the share button in your browser
+2. Select "Add to Home Screen"
+3. HAPI appears as a native app icon
+
+On desktop (Chrome/Edge):
+1. Click the install icon in the address bar
+2. Click "Install"
+
+### Check Status
+
+Run diagnostics to verify everything is working:
+
+```bash
+hapi doctor
+```
+
+Output:
+```
+✓ Hub connectivity: OK
+✓ Authentication: Valid token
+✓ Claude CLI: Found at /usr/local/bin/claude
+✓ Runner: Not running
+✓ Sessions: 1 active
+```
+
+## Troubleshooting
+
+<Warning>
+  **Connection refused?** 
+  
+  Make sure the hub is running in a separate terminal:
+  ```bash
+  hapi hub --relay
+  ```
+</Warning>
+
+<Warning>
+  **Invalid token?**
+  
+  Retrieve your token:
+  ```bash
+  cat ~/.hapi/settings.json | grep cliApiToken
+  ```
+  
+  Or regenerate it:
+  ```bash
+  rm ~/.hapi/settings.json
+  hapi hub --relay  # Creates new token
+  ```
+</Warning>
+
+<Warning>
+  **Relay connection issues?**
+  
+  If UDP is blocked on your network, force TCP mode:
+  ```bash
+  HAPI_RELAY_FORCE_TCP=true hapi hub --relay
+  ```
+</Warning>
+
+## Next Steps
+
+Now that you have HAPI running, explore more features:
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="book" href="/installation">
+    Complete setup with Telegram, voice assistant, and background services
+  </Card>
+  <Card title="How It Works" icon="gear" href="/concepts/how-it-works">
+    Understand the architecture and data flow
+  </Card>
+  <Card title="Self-Hosting" icon="server" href="/installation#self-hosted-tunnels">
+    Use Cloudflare Tunnel or Tailscale instead of the public relay
+  </Card>
+  <Card title="Runner Setup" icon="play" href="/installation#runner-setup">
+    Enable remote session spawning from your phone
+  </Card>
+</CardGroup>
+
+## Quick Reference
+
+### Essential Commands
+
+```bash
+# Hub management
+hapi hub --relay          # Start hub with public relay
+hapi hub                  # Start hub (local only)
+hapi server               # Alias for 'hapi hub'
+
+# Session commands
+hapi                      # Start Claude Code
+hapi codex                # Start Codex
+hapi cursor               # Start Cursor Agent
+hapi gemini               # Start Gemini
+hapi opencode             # Start OpenCode
+
+# Authentication
+hapi auth status          # Show auth config
+hapi auth login           # Save access token
+hapi auth logout          # Clear credentials
+
+# Diagnostics
+hapi doctor               # Full system check
+hapi doctor clean         # Kill runaway processes
+
+# Runner (for remote spawning)
+hapi runner start         # Start background runner
+hapi runner stop          # Stop runner
+hapi runner status        # Show runner info
+hapi runner logs          # View runner logs
+```
+
+### Configuration Files
+
+```
+~/.hapi/
+├── settings.json         # Main configuration (token, URLs)
+├── hapi.db              # SQLite database (sessions, messages)
+├── runner.state.json    # Runner process state
+└── logs/                # Log files
+```
+
+### Environment Variables
+
+```bash
+export CLI_API_TOKEN="your-token"          # Authentication token
+export HAPI_API_URL="http://localhost:3006"  # Hub URL
+export HAPI_HOME="~/.hapi"                   # Config directory
+```
+
+For a complete list, see the [Installation Guide](/installation#configuration).

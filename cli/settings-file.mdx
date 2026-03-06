@@ -1,0 +1,651 @@
+---
+title: 'Settings File'
+description: 'Understanding and managing the HAPI settings.json file'
+---
+
+## Overview
+
+HAPI CLI stores local configuration in `settings.json` located in the HAPI home directory (default: `~/.hapi/settings.json`).
+
+## File Location
+
+The settings file path depends on the `HAPI_HOME` environment variable:
+
+```bash
+# Default location
+~/.hapi/settings.json
+
+# Custom HAPI_HOME
+$HAPI_HOME/settings.json
+```
+
+**Find your settings file:**
+```bash
+# View path
+echo "$HOME/.hapi/settings.json"
+
+# With custom HAPI_HOME
+echo "${HAPI_HOME:-$HOME/.hapi}/settings.json"
+
+# Read contents
+cat ~/.hapi/settings.json
+```
+
+---
+
+## File Structure
+
+### Basic Example
+
+```json
+{
+  "machineId": "machine-abc123def456",
+  "machineIdConfirmedByServer": true,
+  "cliApiToken": "hapi_abc123xyz789def456ghi789jkl012",
+  "apiUrl": "https://hapi.example.com",
+  "runnerAutoStartWhenRunningHappy": true
+}
+```
+
+---
+
+## Fields
+
+### machineId
+
+Unique identifier for this machine, used by the hub to track sessions and permissions.
+
+<ParamField path="machineId" type="string" optional>
+  Unique machine identifier (UUID format).
+  
+  **Generated:** Automatically on first connection to hub
+  
+  **Format:** `machine-{random-hex}`
+  
+  **Example:** `machine-abc123def456ghi789jkl012mno345`
+</ParamField>
+
+**Lifecycle:**
+
+1. **First run:** Not present, CLI generates temporary ID
+2. **Hub connection:** Hub confirms and assigns persistent ID
+3. **Subsequent runs:** Reuses saved machine ID
+
+**View your machine ID:**
+```bash
+hapi auth status
+```
+
+**Clear machine ID:**
+```bash
+hapi auth logout  # Clears both token and machine ID
+```
+
+---
+
+### machineIdConfirmedByServer
+
+Indicates whether the hub has confirmed this machine ID.
+
+<ParamField path="machineIdConfirmedByServer" type="boolean" default="false">
+  Whether the hub has validated this machine ID.
+  
+  **Values:**
+  - `true`: Machine ID confirmed by hub
+  - `false` or absent: Pending confirmation
+</ParamField>
+
+**Typical flow:**
+
+1. First connection: `machineIdConfirmedByServer` not present
+2. Hub responds: Sets to `true` and saves machine ID
+3. Subsequent connections: Uses confirmed ID
+
+---
+
+### cliApiToken
+
+The authentication token for connecting to the HAPI hub.
+
+<ParamField path="cliApiToken" type="string" optional>
+  Saved authentication token.
+  
+  **Source:** Set by `hapi auth login` command
+  
+  **Priority:** Environment variable `CLI_API_TOKEN` takes precedence
+</ParamField>
+
+**Set via command:**
+```bash
+hapi auth login
+```
+
+**Token priority (highest to lowest):**
+
+1. `CLI_API_TOKEN` environment variable
+2. `cliApiToken` in settings.json
+3. Interactive prompt (first run)
+
+**Clear token:**
+```bash
+hapi auth logout
+```
+
+---
+
+### apiUrl
+
+Custom hub URL stored in settings (optional).
+
+<ParamField path="apiUrl" type="string" optional>
+  Hub server URL.
+  
+  **Priority:** Environment variable `HAPI_API_URL` takes precedence
+  
+  **Default (if not set):** `http://localhost:3006`
+</ParamField>
+
+**URL priority (highest to lowest):**
+
+1. `HAPI_API_URL` environment variable
+2. `apiUrl` in settings.json
+3. Default: `http://localhost:3006`
+
+**Example:**
+```json
+{
+  "apiUrl": "https://hapi.example.com"
+}
+```
+
+---
+
+### serverUrl (Legacy)
+
+Legacy field name for `apiUrl`. Read-only for backward compatibility.
+
+<ParamField path="serverUrl" type="string" deprecated>
+  Old field name for hub URL. Replaced by `apiUrl`.
+  
+  **Migration:** Automatically migrated to `apiUrl` when read
+</ParamField>
+
+<Note>
+  If you have old settings with `serverUrl`, it will be automatically migrated to `apiUrl`.
+</Note>
+
+---
+
+### runnerAutoStartWhenRunningHappy
+
+Controls whether the runner should auto-start when launching sessions.
+
+<ParamField path="runnerAutoStartWhenRunningHappy" type="boolean" optional>
+  Enable automatic runner startup.
+  
+  **Default:** Not set (runner starts automatically)
+  
+  **Values:**
+  - `true` or absent: Runner auto-starts
+  - `false`: Manual runner management required
+</ParamField>
+
+**Disable auto-start (advanced):**
+
+Edit settings.json manually:
+```json
+{
+  "runnerAutoStartWhenRunningHappy": false
+}
+```
+
+Then manually manage runner:
+```bash
+hapi runner start
+hapi runner stop
+```
+
+---
+
+## File Operations
+
+### Reading Settings
+
+**View entire file:**
+```bash
+cat ~/.hapi/settings.json
+```
+
+**Pretty-print JSON:**
+```bash
+cat ~/.hapi/settings.json | python3 -m json.tool
+# or
+cat ~/.hapi/settings.json | jq .
+```
+
+**Extract specific field:**
+```bash
+# Using jq
+cat ~/.hapi/settings.json | jq -r '.machineId'
+
+# Using python
+cat ~/.hapi/settings.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["machineId"])'
+```
+
+---
+
+### Editing Settings
+
+<Warning>
+  The settings file uses atomic file locking. Concurrent edits are safe, but avoid manual editing while HAPI commands are running.
+</Warning>
+
+**Safe editing:**
+
+1. Stop runner:
+   ```bash
+   hapi runner stop
+   ```
+
+2. Edit file:
+   ```bash
+   nano ~/.hapi/settings.json
+   # or
+   vim ~/.hapi/settings.json
+   ```
+
+3. Validate JSON:
+   ```bash
+   cat ~/.hapi/settings.json | python3 -m json.tool
+   ```
+
+4. Restart runner:
+   ```bash
+   hapi runner start
+   ```
+
+---
+
+### Backing Up Settings
+
+**Create backup:**
+```bash
+cp ~/.hapi/settings.json ~/.hapi/settings.json.backup
+```
+
+**Restore from backup:**
+```bash
+cp ~/.hapi/settings.json.backup ~/.hapi/settings.json
+```
+
+**Backup entire HAPI directory:**
+```bash
+tar -czf hapi-backup-$(date +%Y%m%d).tar.gz ~/.hapi/
+```
+
+---
+
+### Resetting Settings
+
+**Clear specific fields:**
+```bash
+# Clear token and machine ID
+hapi auth logout
+
+# This removes:
+# - cliApiToken
+# - machineId
+# - machineIdConfirmedByServer
+```
+
+**Complete reset:**
+```bash
+# Stop runner
+hapi runner stop
+
+# Remove settings file
+rm ~/.hapi/settings.json
+
+# Restart (will create new settings)
+hapi auth login
+```
+
+---
+
+## File Locking
+
+HAPI uses atomic file locking to prevent corruption from concurrent access.
+
+### Lock File
+
+When updating settings, HAPI creates a temporary lock:
+
+```
+~/.hapi/settings.json.lock
+```
+
+**Lock behavior:**
+
+1. Process attempts to acquire lock
+2. If locked, waits up to 5 seconds (50 attempts × 100ms)
+3. If stale lock detected (> 10 seconds old), removes it
+4. Acquires lock, updates settings, releases lock
+
+**Stale lock cleanup:**
+
+If you see a stale lock file:
+
+```bash
+# Check if any HAPI process is running
+ps aux | grep hapi
+
+# If no processes, safe to remove
+rm ~/.hapi/settings.json.lock
+```
+
+---
+
+## Multiple Environments
+
+Use separate settings files for different environments (dev/staging/prod).
+
+### Method 1: Separate HAPI_HOME
+
+```bash
+# Development
+export HAPI_HOME=~/.hapi-dev
+export CLI_API_TOKEN=dev-token
+hapi auth login
+
+# Staging  
+export HAPI_HOME=~/.hapi-staging
+export CLI_API_TOKEN=staging-token
+hapi auth login
+
+# Production
+export HAPI_HOME=~/.hapi-prod
+export CLI_API_TOKEN=prod-token
+hapi auth login
+```
+
+Each environment has its own:
+- `settings.json`
+- `runner.state.json`
+- `logs/`
+
+### Method 2: Shell Aliases
+
+Add to `~/.bashrc` or `~/.zshrc`:
+
+```bash
+# Development
+alias hapi-dev='HAPI_HOME=~/.hapi-dev HAPI_API_URL=http://localhost:3006 hapi'
+
+# Staging
+alias hapi-staging='HAPI_HOME=~/.hapi-staging HAPI_API_URL=https://staging.example.com hapi'
+
+# Production
+alias hapi-prod='HAPI_HOME=~/.hapi-prod HAPI_API_URL=https://hapi.example.com hapi'
+```
+
+Usage:
+```bash
+hapi-dev auth status
+hapi-staging codex
+hapi-prod cursor
+```
+
+---
+
+## Troubleshooting
+
+### Settings File Not Found
+
+**Symptom:**
+```
+Error: ENOENT: no such file or directory, open '/home/user/.hapi/settings.json'
+```
+
+**Fix:**
+
+The file is created automatically on first run. If missing:
+
+```bash
+# Create HAPI home directory
+mkdir -p ~/.hapi
+
+# Run auth to create settings
+hapi auth login
+```
+
+---
+
+### Corrupted Settings File
+
+**Symptom:**
+```
+Error: Unexpected token in JSON at position 45
+```
+
+**Fix:**
+
+```bash
+# Validate JSON
+cat ~/.hapi/settings.json | python3 -m json.tool
+
+# If invalid, restore from backup
+cp ~/.hapi/settings.json.backup ~/.hapi/settings.json
+
+# Or reset
+rm ~/.hapi/settings.json
+hapi auth login
+```
+
+---
+
+### Machine ID Conflict
+
+**Symptom:**
+```
+Machine access denied. This machineId is already registered under a different namespace.
+```
+
+**Fix:**
+
+Clear machine ID and re-register:
+
+```bash
+hapi auth logout
+hapi auth login
+hapi  # Triggers machine registration
+```
+
+---
+
+### Lock File Issues
+
+**Symptom:**
+```
+Failed to acquire settings lock after 5 seconds
+```
+
+**Fix:**
+
+```bash
+# Check for running processes
+ps aux | grep hapi
+
+# If no processes, remove stale lock
+rm ~/.hapi/settings.json.lock
+
+# Retry operation
+hapi auth status
+```
+
+---
+
+### Token Not Being Used
+
+**Symptom:**
+
+Token is in settings.json but authentication fails.
+
+**Check priority:**
+
+```bash
+hapi auth status
+```
+
+If it shows "Token Source: environment", the environment variable is overriding settings.json.
+
+**Fix:**
+
+```bash
+# Option 1: Unset environment variable
+unset CLI_API_TOKEN
+
+# Option 2: Update environment variable
+export CLI_API_TOKEN=correct-token
+
+# Option 3: Update settings file
+hapi auth login
+```
+
+---
+
+## Advanced Usage
+
+### Programmatic Access
+
+**Read settings in shell script:**
+
+```bash
+#!/bin/bash
+
+SETTINGS_FILE="${HAPI_HOME:-$HOME/.hapi}/settings.json"
+
+if [ -f "$SETTINGS_FILE" ]; then
+  MACHINE_ID=$(cat "$SETTINGS_FILE" | jq -r '.machineId // "none"')
+  API_URL=$(cat "$SETTINGS_FILE" | jq -r '.apiUrl // "default"')
+  
+  echo "Machine ID: $MACHINE_ID"
+  echo "API URL: $API_URL"
+else
+  echo "Settings file not found"
+fi
+```
+
+**Update settings in script:**
+
+```bash
+#!/bin/bash
+
+SETTINGS_FILE="${HAPI_HOME:-$HOME/.hapi}/settings.json"
+
+# Read current settings
+SETTINGS=$(cat "$SETTINGS_FILE")
+
+# Update apiUrl field
+NEW_SETTINGS=$(echo "$SETTINGS" | jq '.apiUrl = "https://new-hub.com"')
+
+# Write back
+echo "$NEW_SETTINGS" > "$SETTINGS_FILE"
+```
+
+---
+
+### Migration Between Systems
+
+**Export settings from old system:**
+```bash
+# Backup entire HAPI directory
+tar -czf hapi-export.tar.gz ~/.hapi/
+
+# Or just settings
+cp ~/.hapi/settings.json ./hapi-settings-backup.json
+```
+
+**Import to new system:**
+```bash
+# Full restore
+tar -xzf hapi-export.tar.gz -C ~/
+
+# Or just settings
+mkdir -p ~/.hapi
+cp hapi-settings-backup.json ~/.hapi/settings.json
+```
+
+<Note>
+  When migrating, the `machineId` will move with the settings. If you want a fresh machine ID on the new system, remove it from settings.json after import.
+</Note>
+
+---
+
+## Security
+
+<Warning>
+  The settings file contains your `cliApiToken`. Protect it like a password.
+</Warning>
+
+### File Permissions
+
+**Check permissions:**
+```bash
+ls -la ~/.hapi/settings.json
+```
+
+**Set secure permissions:**
+```bash
+chmod 600 ~/.hapi/settings.json
+```
+
+**Secure entire HAPI directory:**
+```bash
+chmod 700 ~/.hapi
+chmod 600 ~/.hapi/settings.json
+chmod 600 ~/.hapi/*.key
+```
+
+### Best Practices
+
+1. **Don't commit settings files:**
+   ```bash
+   # Add to .gitignore
+   echo ".hapi/" >> ~/.gitignore
+   ```
+
+2. **Don't share settings files:**
+   Each machine should have its own `machineId`
+
+3. **Use environment variables in CI/CD:**
+   Don't store tokens in settings.json on build servers
+
+4. **Backup encrypted:**
+   ```bash
+   tar -czf - ~/.hapi/ | gpg -c > hapi-backup.tar.gz.gpg
+   ```
+
+5. **Rotate tokens periodically:**
+   ```bash
+   hapi auth logout
+   hapi auth login  # Enter new token
+   ```
+
+---
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Environment Variables" icon="gear" href="/cli/environment-variables">
+    Configure via environment variables
+  </Card>
+  <Card title="Authentication" icon="key" href="/cli/auth-commands">
+    Manage tokens via CLI commands
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+- [Environment Variables](/cli/environment-variables) - Override settings with env vars
+- [Authentication Commands](/cli/auth-commands) - Manage tokens via CLI
+- [Diagnostics](/cli/diagnostics) - Troubleshoot configuration issues

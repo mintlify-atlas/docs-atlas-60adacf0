@@ -1,0 +1,163 @@
+---
+title: Authentication
+description: Authenticate and obtain JWT tokens
+---
+
+## POST /api/auth
+
+Authenticate using either an access token or Telegram initData and receive a JWT token.
+
+### Request Body
+
+<ParamField body="accessToken" type="string">
+  CLI API token in format `CLI_API_TOKEN:<namespace>`. Mutually exclusive with `initData`.
+</ParamField>
+
+<ParamField body="initData" type="string">
+  Telegram Mini App initData string. Mutually exclusive with `accessToken`.
+</ParamField>
+
+### Response
+
+<ResponseField name="token" type="string">
+  JWT token valid for 15 minutes
+</ResponseField>
+
+<ResponseField name="user" type="object">
+  <Expandable title="properties">
+    <ResponseField name="id" type="number">
+      User ID
+    </ResponseField>
+    <ResponseField name="username" type="string" optional>
+      Telegram username (if using Telegram auth)
+    </ResponseField>
+    <ResponseField name="firstName" type="string" optional>
+      User's first name
+    </ResponseField>
+    <ResponseField name="lastName" type="string" optional>
+      User's last name
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example: Access Token
+
+```bash
+curl -X POST http://127.0.0.1:3006/api/auth \
+  -H "Content-Type: application/json" \
+  -d '{
+    "accessToken": "your-cli-api-token:default"
+  }'
+```
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": 1,
+    "firstName": "Web User"
+  }
+}
+```
+
+### Example: Telegram
+
+```bash
+curl -X POST http://127.0.0.1:3006/api/auth \
+  -H "Content-Type: application/json" \
+  -d '{
+    "initData": "query_id=AAH..."
+  }'
+```
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": 1,
+    "username": "johndoe",
+    "firstName": "John",
+    "lastName": "Doe"
+  }
+}
+```
+
+### Errors
+
+- `400` - Invalid body
+- `401` - Invalid access token or initData
+- `401` - `{"error": "not_bound"}` - Telegram user not bound to a namespace
+- `503` - Telegram authentication disabled (TELEGRAM_BOT_TOKEN not configured)
+
+---
+
+## POST /api/bind
+
+Bind a Telegram account to a namespace using both Telegram initData and an access token.
+
+### Request Body
+
+<ParamField body="initData" type="string" required>
+  Telegram Mini App initData string
+</ParamField>
+
+<ParamField body="accessToken" type="string" required>
+  CLI API token in format `CLI_API_TOKEN:<namespace>`
+</ParamField>
+
+### Response
+
+Same as `/api/auth` response.
+
+### Example
+
+```bash
+curl -X POST http://127.0.0.1:3006/api/bind \
+  -H "Content-Type: application/json" \
+  -d '{
+    "initData": "query_id=AAH...",
+    "accessToken": "your-cli-api-token:myproject"
+  }'
+```
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": 1,
+    "username": "johndoe",
+    "firstName": "John",
+    "lastName": "Doe"
+  }
+}
+```
+
+### Errors
+
+- `400` - Invalid body
+- `401` - Invalid access token or initData
+- `409` - `{"error": "already_bound"}` - Telegram user already bound to a different namespace
+- `503` - Telegram authentication disabled
+
+---
+
+## Token Format
+
+The access token follows the format:
+
+```
+CLI_API_TOKEN:<namespace>
+```
+
+- **CLI_API_TOKEN** - Base shared secret (configured via environment variable)
+- **namespace** - Isolation identifier for multi-user/multi-project setups
+
+### Example
+
+If `CLI_API_TOKEN=secret123`, valid access tokens include:
+
+- `secret123:default`
+- `secret123:myproject`
+- `secret123:production`
+
+Namespaces provide isolation between different projects or users.

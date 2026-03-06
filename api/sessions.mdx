@@ -1,0 +1,540 @@
+---
+title: Sessions
+description: Manage coding sessions
+---
+
+## GET /api/sessions
+
+List all sessions in the authenticated user's namespace.
+
+**Authentication:** Required
+
+### Response
+
+<ResponseField name="sessions" type="array">
+  Array of session summaries, sorted by active status and updated time.
+  <Expandable title="Session summary properties">
+    <ResponseField name="id" type="string">
+      Session ID
+    </ResponseField>
+    <ResponseField name="namespace" type="string">
+      Namespace this session belongs to
+    </ResponseField>
+    <ResponseField name="active" type="boolean">
+      Whether the session is currently active
+    </ResponseField>
+    <ResponseField name="activeAt" type="number">
+      Unix timestamp (ms) when session became active
+    </ResponseField>
+    <ResponseField name="createdAt" type="number">
+      Unix timestamp (ms) when session was created
+    </ResponseField>
+    <ResponseField name="updatedAt" type="number">
+      Unix timestamp (ms) when session was last updated
+    </ResponseField>
+    <ResponseField name="thinking" type="boolean">
+      Whether the agent is currently thinking
+    </ResponseField>
+    <ResponseField name="metadata" type="object" optional>
+      Session metadata (path, host, name, etc.)
+    </ResponseField>
+    <ResponseField name="agentState" type="object" optional>
+      Agent state including pending requests
+    </ResponseField>
+    <ResponseField name="permissionMode" type="string" optional>
+      Current permission mode (e.g., "default", "bypassPermissions")
+    </ResponseField>
+    <ResponseField name="modelMode" type="string" optional>
+      Current model mode (e.g., "default", "sonnet", "opus")
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  http://127.0.0.1:3006/api/sessions
+```
+
+```json
+{
+  "sessions": [
+    {
+      "id": "abc123",
+      "namespace": "default",
+      "active": true,
+      "activeAt": 1709856000000,
+      "createdAt": 1709850000000,
+      "updatedAt": 1709856000000,
+      "thinking": false,
+      "metadata": {
+        "path": "/home/user/project",
+        "host": "laptop",
+        "name": "My Project",
+        "flavor": "claude"
+      },
+      "permissionMode": "default"
+    }
+  ]
+}
+```
+
+---
+
+## GET /api/sessions/:id
+
+Get full details for a specific session.
+
+**Authentication:** Required
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Session ID
+</ParamField>
+
+### Response
+
+<ResponseField name="session" type="object">
+  Full session object with all metadata and state
+</ResponseField>
+
+### Example
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  http://127.0.0.1:3006/api/sessions/abc123
+```
+
+### Errors
+
+- `403` - Access denied (session belongs to different namespace)
+- `404` - Session not found
+- `503` - Hub not connected
+
+---
+
+## POST /api/sessions/:id/abort
+
+Abort a running session.
+
+**Authentication:** Required
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Session ID
+</ParamField>
+
+### Response
+
+```json
+{"ok": true}
+```
+
+### Example
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  http://127.0.0.1:3006/api/sessions/abc123/abort
+```
+
+### Errors
+
+- `403` - Access denied
+- `404` - Session not found
+- `409` - Session not active
+
+---
+
+## POST /api/sessions/:id/switch
+
+Switch an active session to remote mode (web-controlled).
+
+**Authentication:** Required
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Session ID
+</ParamField>
+
+### Response
+
+```json
+{"ok": true}
+```
+
+### Example
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  http://127.0.0.1:3006/api/sessions/abc123/switch
+```
+
+### Errors
+
+- `403` - Access denied
+- `404` - Session not found
+- `409` - Session not active
+
+---
+
+## POST /api/sessions/:id/resume
+
+Resume an inactive session on an available machine.
+
+**Authentication:** Required
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Session ID
+</ParamField>
+
+### Response
+
+<ResponseField name="type" type="string">
+  "success"
+</ResponseField>
+
+<ResponseField name="sessionId" type="string">
+  The resumed session ID
+</ResponseField>
+
+### Example
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  http://127.0.0.1:3006/api/sessions/abc123/resume
+```
+
+```json
+{
+  "type": "success",
+  "sessionId": "abc123"
+}
+```
+
+### Errors
+
+- `403` - Access denied
+- `404` - Session not found
+- `503` - No machine online
+
+---
+
+## POST /api/sessions/:id/upload
+
+Upload a file to an active session (max 50MB).
+
+**Authentication:** Required
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Session ID
+</ParamField>
+
+### Request Body
+
+<ParamField body="filename" type="string" required>
+  Filename (max 255 chars)
+</ParamField>
+
+<ParamField body="content" type="string" required>
+  Base64-encoded file content
+</ParamField>
+
+<ParamField body="mimeType" type="string" required>
+  MIME type (max 255 chars)
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether upload succeeded
+</ResponseField>
+
+<ResponseField name="path" type="string" optional>
+  Path where file was saved
+</ResponseField>
+
+<ResponseField name="error" type="string" optional>
+  Error message if failed
+</ResponseField>
+
+### Example
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filename": "screenshot.png",
+    "content": "iVBORw0KGgoAAAANS...",
+    "mimeType": "image/png"
+  }' \
+  http://127.0.0.1:3006/api/sessions/abc123/upload
+```
+
+```json
+{
+  "success": true,
+  "path": "/tmp/hapi-upload-abc123-screenshot.png"
+}
+```
+
+### Errors
+
+- `400` - Invalid body
+- `403` - Access denied
+- `404` - Session not found
+- `409` - Session not active
+- `413` - File too large (max 50MB)
+- `500` - Upload failed
+
+---
+
+## POST /api/sessions/:id/upload/delete
+
+Delete a previously uploaded file.
+
+**Authentication:** Required
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Session ID
+</ParamField>
+
+### Request Body
+
+<ParamField body="path" type="string" required>
+  Path to the uploaded file
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether deletion succeeded
+</ResponseField>
+
+### Example
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"path": "/tmp/hapi-upload-abc123-screenshot.png"}' \
+  http://127.0.0.1:3006/api/sessions/abc123/upload/delete
+```
+
+---
+
+## POST /api/sessions/:id/archive
+
+Archive an active session.
+
+**Authentication:** Required
+
+### Response
+
+```json
+{"ok": true}
+```
+
+### Example
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  http://127.0.0.1:3006/api/sessions/abc123/archive
+```
+
+---
+
+## PATCH /api/sessions/:id
+
+Rename a session.
+
+**Authentication:** Required
+
+### Request Body
+
+<ParamField body="name" type="string" required>
+  New session name (1-255 chars)
+</ParamField>
+
+### Response
+
+```json
+{"ok": true}
+```
+
+### Example
+
+```bash
+curl -X PATCH -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Updated Project Name"}' \
+  http://127.0.0.1:3006/api/sessions/abc123
+```
+
+### Errors
+
+- `400` - Invalid body
+- `409` - Version conflict (session modified concurrently)
+- `500` - Failed to rename
+
+---
+
+## DELETE /api/sessions/:id
+
+Delete an inactive session.
+
+**Authentication:** Required
+
+### Response
+
+```json
+{"ok": true}
+```
+
+### Example
+
+```bash
+curl -X DELETE -H "Authorization: Bearer <token>" \
+  http://127.0.0.1:3006/api/sessions/abc123
+```
+
+### Errors
+
+- `409` - Cannot delete active session (archive first)
+
+---
+
+## GET /api/sessions/:id/slash-commands
+
+List available slash commands for a session.
+
+**Authentication:** Required
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether the request succeeded
+</ResponseField>
+
+<ResponseField name="commands" type="array" optional>
+  Array of slash command names
+</ResponseField>
+
+### Example
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  http://127.0.0.1:3006/api/sessions/abc123/slash-commands
+```
+
+```json
+{
+  "success": true,
+  "commands": ["/commit", "/push", "/test"]
+}
+```
+
+---
+
+## GET /api/sessions/:id/skills
+
+List available skills for a session.
+
+**Authentication:** Required
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether the request succeeded
+</ResponseField>
+
+<ResponseField name="skills" type="array" optional>
+  Array of skill objects
+</ResponseField>
+
+### Example
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  http://127.0.0.1:3006/api/sessions/abc123/skills
+```
+
+---
+
+## POST /api/sessions/:id/permission-mode
+
+Set the permission mode for an active session.
+
+**Authentication:** Required
+
+### Request Body
+
+<ParamField body="mode" type="string" required>
+  Permission mode. Valid values depend on agent flavor:
+  - **Claude**: `default`, `acceptEdits`, `bypassPermissions`, `plan`
+  - **Codex/Gemini**: `default`, `read-only`, `safe-yolo`, `yolo`
+  - **OpenCode**: `default`, `yolo`
+  - **Cursor**: `default`, `plan`, `ask`, `yolo`
+</ParamField>
+
+### Response
+
+```json
+{"ok": true}
+```
+
+### Example
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "bypassPermissions"}' \
+  http://127.0.0.1:3006/api/sessions/abc123/permission-mode
+```
+
+### Errors
+
+- `400` - Invalid permission mode for session flavor
+- `409` - Failed to apply mode
+
+---
+
+## POST /api/sessions/:id/model
+
+Set the model mode for an active Claude session.
+
+**Authentication:** Required
+
+### Request Body
+
+<ParamField body="model" type="string" required>
+  Model mode: `default`, `sonnet`, or `opus` (Claude only)
+</ParamField>
+
+### Response
+
+```json
+{"ok": true}
+```
+
+### Example
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "opus"}' \
+  http://127.0.0.1:3006/api/sessions/abc123/model
+```
+
+### Errors
+
+- `400` - Model mode only supported for Claude sessions
+- `409` - Failed to apply mode

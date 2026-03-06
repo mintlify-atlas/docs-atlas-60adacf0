@@ -1,0 +1,215 @@
+---
+title: Remote Control
+description: Seamlessly switch between local terminal and remote devices
+---
+
+HAPI's defining feature is the ability to seamlessly hand off control between local terminal and remote devices without losing session state.
+
+## Overview
+
+Start coding sessions on your computer and monitor/control them from your phone. Switch between local terminal mode and remote control as your workflow requires.
+
+<CardGroup cols={2}>
+  <Card title="Local Mode" icon="terminal">
+    Full terminal experience with instant response. Best for focused, uninterrupted coding.
+  </Card>
+  <Card title="Remote Mode" icon="mobile">
+    Control via Web/PWA/Telegram. Approve permissions and monitor progress on the go.
+  </Card>
+</CardGroup>
+
+## Session Modes
+
+### Local Mode
+
+When working in local mode, you have the full terminal experience — it is native Claude Code, Codex, or OpenCode:
+
+- **Direct keyboard input** with instant response
+- **Full terminal UI** with syntax highlighting
+- **Best for focused work** - uninterrupted coding sessions
+- **All processing local** - AI runs on your machine
+
+### Remote Mode
+
+Switch to remote mode when you need to step away:
+
+- **Control from anywhere** - Web/PWA/Telegram from any device
+- **Approve permissions** on the go
+- **Monitor progress** while away from your desk
+- **Session continues** running on your local machine
+
+## Switching Between Modes
+
+HAPI makes it trivial to switch control between your terminal and remote devices.
+
+### Local → Remote
+
+Your session automatically switches to remote mode when:
+
+1. You receive a message from phone/web
+2. Terminal shows "Remote mode - waiting for input"
+3. Control transfers to your remote device
+
+No manual action required — HAPI detects remote input and switches automatically.
+
+### Remote → Local
+
+To regain local control from your terminal:
+
+1. **Press spacebar twice** (double-space) in the terminal
+2. Terminal instantly switches back to local mode
+3. Continue typing as if you never left
+
+<Note>
+The session state is preserved across mode switches — your conversation history, context, and agent state remain intact.
+</Note>
+
+## Real-Time Updates
+
+When in remote mode, all changes sync in real-time:
+
+- **Message streaming** - See agent responses as they're generated
+- **Permission requests** - Get notified instantly on your phone
+- **Status changes** - Active/inactive session state
+- **Tool usage** - Watch as the agent uses tools
+
+### Communication Flow
+
+```
+User (Phone)                 Hub                     CLI
+     │                         │                       │
+     │──── Send message ──────►│                       │
+     │                         │─── Socket.IO emit ───►│
+     │                         │                       │
+     │                         │                       ├── AI processes
+     │                         │                       │
+     │                         │◄── Stream response ───│
+     │◄─────── SSE ────────────│                       │
+     │                         │                       │
+```
+
+## Session Control Features
+
+### From Web/PWA
+
+When controlling remotely, you have access to:
+
+<CardGroup cols={2}>
+  <Card title="Send Messages" icon="message">
+    Type instructions and questions to your AI agent
+  </Card>
+  <Card title="Permission Control" icon="shield-check">
+    Approve or deny file edits, bash commands, and tool usage
+  </Card>
+  <Card title="Mode Switching" icon="toggle-on">
+    Change permission modes (default, acceptEdits, YOLO, plan)
+  </Card>
+  <Card title="Session Management" icon="list">
+    Abort sessions, switch machines, or spawn new sessions
+  </Card>
+</CardGroup>
+
+### Session Actions
+
+Available actions in the web interface:
+
+| Action | Description |
+|--------|-------------|
+| **Send Message** | Give instructions to the AI agent |
+| **Approve/Deny** | Handle permission requests |
+| **Change Mode** | Switch permission mode (YOLO, safe, plan) |
+| **Abort Session** | Stop the current session |
+| **Switch to Remote** | Force session into remote mode |
+| **Resume Session** | Restart an inactive session |
+
+## Use Cases
+
+### Remote Control While Away
+
+Start a session at your desk, continue from your phone:
+
+1. **Morning**: Start coding session on desktop
+2. **Commute**: Check progress on phone, approve file edits
+3. **Coffee break**: Send new instructions via Telegram
+4. **Back at desk**: Double-space to regain local control
+
+### Permission Approval
+
+Approve permissions without returning to your desk:
+
+1. AI requests file access
+2. Get notification on phone (push or Telegram)
+3. Review the permission request
+4. Approve with one tap
+5. Session continues automatically
+
+### Multi-Device Collaboration
+
+View session progress on multiple devices:
+
+- **Desktop terminal**: Primary development interface
+- **Phone/tablet**: Monitor progress and approve permissions
+- **Another computer**: Access via web browser
+
+<Tip>
+All devices see the same session state in real-time. You can have multiple devices viewing the same session simultaneously.
+</Tip>
+
+## Architecture
+
+The seamless handoff is powered by HAPI's architecture:
+
+```
+┌─────────────────┐                    ┌─────────────────┐
+│   Local Mode    │◄──────────────────►│   Remote Mode   │
+│   (Terminal)    │                    │   (Phone/Web)   │
+└─────────────────┘                    └─────────────────┘
+        │                                      │
+        │  ┌────────────────────────────┐      │
+        └─►│  Same Session, Same State  │◄─────┘
+           └────────────────────────────┘
+```
+
+- **CLI** wraps the AI agent and maintains local state
+- **Hub** coordinates communication via Socket.IO and SSE
+- **Web app** provides remote interface with real-time updates
+- **SQLite** persists session history and messages
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="When to Use Local Mode">
+    - Writing code with frequent iterations
+    - Reading long agent responses
+    - Need immediate keyboard response
+    - Working with sensitive information
+  </Accordion>
+
+  <Accordion title="When to Use Remote Mode">
+    - Away from your desk
+    - Need to approve permissions
+    - Monitoring long-running tasks
+    - Want notifications on your phone
+  </Accordion>
+
+  <Accordion title="Switching Tips">
+    - Switch freely — there's no penalty
+    - Use remote mode for approval workflows
+    - Return to local mode for intensive coding
+    - Keep the terminal open to maintain session
+  </Accordion>
+</AccordionGroup>
+
+## Related Features
+
+<CardGroup cols={3}>
+  <Card title="PWA" href="/features/pwa" icon="mobile-screen">
+    Install HAPI as a native-like app
+  </Card>
+  <Card title="Telegram" href="/features/telegram" icon="paper-plane">
+    Get notifications via Telegram
+  </Card>
+  <Card title="Permissions" href="/features/permissions" icon="lock">
+    Control agent access to tools
+  </Card>
+</CardGroup>

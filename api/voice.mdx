@@ -1,0 +1,188 @@
+---
+title: Voice
+description: Get ElevenLabs conversation tokens for voice assistant
+---
+
+## POST /api/voice/token
+
+Get an ElevenLabs ConvAI conversation token for voice interaction.
+
+**Authentication:** Required
+
+### Request Body
+
+<ParamField body="customAgentId" type="string" optional>
+  Custom ElevenLabs agent ID (overrides ELEVENLABS_AGENT_ID)
+</ParamField>
+
+<ParamField body="customApiKey" type="string" optional>
+  Custom ElevenLabs API key (overrides ELEVENLABS_API_KEY)
+</ParamField>
+
+### Response
+
+<ResponseField name="allowed" type="boolean">
+  Whether voice is available
+</ResponseField>
+
+<ResponseField name="token" type="string" optional>
+  ElevenLabs conversation token (if allowed)
+</ResponseField>
+
+<ResponseField name="agentId" type="string" optional>
+  ElevenLabs agent ID used (if allowed)
+</ResponseField>
+
+<ResponseField name="error" type="string" optional>
+  Error message if not allowed
+</ResponseField>
+
+### Example: Using Default Configuration
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{}' \
+  http://127.0.0.1:3006/api/voice/token
+```
+
+```json
+{
+  "allowed": true,
+  "token": "el_token_abc123xyz...",
+  "agentId": "el_agent_456"
+}
+```
+
+### Example: Using Custom Agent
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customAgentId": "el_agent_custom",
+    "customApiKey": "sk_custom_key"
+  }' \
+  http://127.0.0.1:3006/api/voice/token
+```
+
+```json
+{
+  "allowed": true,
+  "token": "el_token_xyz789abc...",
+  "agentId": "el_agent_custom"
+}
+```
+
+### Error Response
+
+```json
+{
+  "allowed": false,
+  "error": "ElevenLabs API key not configured"
+}
+```
+
+### Errors
+
+- `400` - Invalid request body or ElevenLabs API key not configured
+- `500` - Failed to create agent or get token from ElevenLabs
+
+---
+
+## Configuration
+
+Voice functionality requires ElevenLabs configuration:
+
+### Environment Variables
+
+```bash
+# Required
+ELEVENLABS_API_KEY=sk_your_api_key
+
+# Optional (auto-created if not set)
+ELEVENLABS_AGENT_ID=el_agent_id
+```
+
+### Agent Auto-Creation
+
+If `ELEVENLABS_AGENT_ID` is not set, the hub will:
+
+1. Search for an existing "Hapi Voice Assistant" agent
+2. If not found, create a new agent automatically
+3. Cache the agent ID for future requests
+
+The agent is configured with:
+
+- **Name:** "Hapi Voice Assistant"
+- **Voice:** Professional assistant voice
+- **Behavior:** Help with coding tasks
+
+### Custom Agent Configuration
+
+You can use a custom agent by:
+
+1. Creating an agent in the ElevenLabs dashboard
+2. Passing `customAgentId` and `customApiKey` in the request
+
+OR
+
+1. Setting `ELEVENLABS_AGENT_ID` environment variable
+
+---
+
+## Using the Token
+
+Once you have a conversation token, use it with the ElevenLabs ConvAI SDK:
+
+```javascript
+import { Conversation } from '@11labs/client'
+
+const response = await fetch('/api/voice/token', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer ' + jwtToken,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({})
+})
+
+const { token, agentId } = await response.json()
+
+const conversation = await Conversation.startSession({
+  signedUrl: token
+})
+
+// Start voice interaction
+await conversation.startSession()
+```
+
+### Token Lifetime
+
+ElevenLabs conversation tokens are short-lived and should be:
+
+- Requested when starting a voice session
+- Not cached or stored long-term
+- Refreshed if the session expires
+
+---
+
+## Voice Assistant Features
+
+The Hapi Voice Assistant can help with:
+
+- Explaining code in your sessions
+- Answering questions about your project
+- Providing coding guidance
+- Reading session summaries aloud
+
+### Integration with Sessions
+
+The voice assistant has access to:
+
+- Session metadata
+- Recent messages
+- Project context
+- Git status
+
+This allows natural voice interaction with your coding sessions.

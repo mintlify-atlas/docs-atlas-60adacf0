@@ -1,0 +1,215 @@
+---
+title: Permissions
+description: Approve or deny permission requests
+---
+
+## POST /api/sessions/:id/permissions/:requestId/approve
+
+Approve a permission request from the agent.
+
+**Authentication:** Required
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Session ID
+</ParamField>
+
+<ParamField path="requestId" type="string" required>
+  Permission request ID (from session's agentState.requests)
+</ParamField>
+
+### Request Body
+
+<ParamField body="mode" type="string" optional>
+  Permission mode to apply for future requests. Valid values depend on agent flavor:
+  - **Claude**: `default`, `acceptEdits`, `bypassPermissions`, `plan`
+  - **Codex/Gemini**: `default`, `read-only`, `safe-yolo`, `yolo`
+  - **OpenCode**: `default`, `yolo`
+  - **Cursor**: `default`, `plan`, `ask`, `yolo`
+</ParamField>
+
+<ParamField body="allowTools" type="array" optional>
+  Array of tool names to allow
+</ParamField>
+
+<ParamField body="decision" type="string" optional>
+  Approval decision type: `approved`, `approved_for_session`, `denied`, or `abort`
+</ParamField>
+
+<ParamField body="answers" type="object" optional>
+  User answers to agent questions. Format varies:
+  - Flat: `{"question1": ["answer1", "answer2"]}`
+  - Nested: `{"question1": {"answers": ["answer1", "answer2"]}}`
+</ParamField>
+
+### Response
+
+```json
+{"ok": true}
+```
+
+### Example: Simple Approval
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{}' \
+  http://127.0.0.1:3006/api/sessions/abc123/permissions/req_456/approve
+```
+
+### Example: Approve with Mode Change
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "acceptEdits",
+    "decision": "approved_for_session"
+  }' \
+  http://127.0.0.1:3006/api/sessions/abc123/permissions/req_456/approve
+```
+
+### Example: Approve with Tool Restrictions
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "allowTools": ["read", "grep"],
+    "decision": "approved"
+  }' \
+  http://127.0.0.1:3006/api/sessions/abc123/permissions/req_456/approve
+```
+
+### Example: Approve with Answers
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "answers": {
+      "feature_name": ["User Authentication"],
+      "priority": ["high"]
+    },
+    "decision": "approved"
+  }' \
+  http://127.0.0.1:3006/api/sessions/abc123/permissions/req_456/approve
+```
+
+### Errors
+
+- `400` - Invalid body or permission mode
+- `403` - Access denied
+- `404` - Session or request not found
+- `409` - Session not active
+- `503` - Hub not connected
+
+---
+
+## POST /api/sessions/:id/permissions/:requestId/deny
+
+Deny a permission request from the agent.
+
+**Authentication:** Required
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Session ID
+</ParamField>
+
+<ParamField path="requestId" type="string" required>
+  Permission request ID
+</ParamField>
+
+### Request Body
+
+<ParamField body="decision" type="string" optional>
+  Denial decision type: `denied` or `abort`
+</ParamField>
+
+### Response
+
+```json
+{"ok": true}
+```
+
+### Example: Simple Denial
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{}' \
+  http://127.0.0.1:3006/api/sessions/abc123/permissions/req_456/deny
+```
+
+### Example: Deny and Abort
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"decision": "abort"}' \
+  http://127.0.0.1:3006/api/sessions/abc123/permissions/req_456/deny
+```
+
+### Errors
+
+- `400` - Invalid body
+- `403` - Access denied
+- `404` - Session or request not found
+- `409` - Session not active
+- `503` - Hub not connected
+
+---
+
+## Permission Request Flow
+
+1. **Agent requests permission** - Request appears in session's `agentState.requests`
+2. **Client receives notification** - Via SSE or WebSocket update
+3. **User reviews request** - View pending requests in `GET /api/sessions/:id`
+4. **User responds** - Call approve or deny endpoint
+5. **Agent receives response** - Via Socket.IO RPC
+6. **Request moves to completed** - Stored in `agentState.completedRequests`
+
+### Permission Request Structure
+
+Requests in `session.agentState.requests` have this structure:
+
+```json
+{
+  "req_456": {
+    "tool": "edit",
+    "arguments": {
+      "path": "src/main.ts",
+      "content": "..."
+    },
+    "createdAt": 1709856000000
+  }
+}
+```
+
+### Completed Request Structure
+
+After approval/denial, requests move to `session.agentState.completedRequests`:
+
+```json
+{
+  "req_456": {
+    "tool": "edit",
+    "arguments": {...},
+    "createdAt": 1709856000000,
+    "completedAt": 1709856100000,
+    "status": "approved",
+    "mode": "acceptEdits",
+    "decision": "approved_for_session"
+  }
+}
+```
+
+### Decision Types
+
+- **`approved`** - Approve this request only
+- **`approved_for_session`** - Approve and apply mode for future requests
+- **`denied`** - Deny this request, agent continues
+- **`abort`** - Deny and abort the agent's current task

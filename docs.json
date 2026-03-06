@@ -1,122 +1,155 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "HAPI",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#2563eb",
+    "light": "#3b82f6",
+    "dark": "#1e40af"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/tiann/hapi"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/tiann/hapi"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
+              "introduction",
               "quickstart",
-              "development"
+              "installation"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/architecture",
+              "concepts/how-it-works",
+              "concepts/sessions",
+              "concepts/agents"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Features",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "features/remote-control",
+              "features/pwa",
+              "features/telegram",
+              "features/voice-assistant",
+              "features/terminal",
+              "features/permissions"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Agents",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "agents/claude-code",
+              "agents/codex",
+              "agents/cursor-agent",
+              "agents/gemini",
+              "agents/opencode"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/relay",
+              "deployment/self-hosted",
+              "deployment/cloudflare-tunnel",
+              "deployment/tailscale"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/namespaces",
+              "advanced/runner",
+              "advanced/worktrees",
+              "advanced/configuration"
+            ]
+          },
+          {
+            "group": "Resources",
+            "pages": [
+              "resources/faq",
+              "resources/troubleshooting",
+              "resources/why-hapi"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "CLI Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Commands",
             "pages": [
-              "api-reference/introduction"
+              "cli/overview",
+              "cli/session-commands",
+              "cli/auth-commands",
+              "cli/runner-commands",
+              "cli/hub-command",
+              "cli/diagnostics"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Configuration",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "cli/environment-variables",
+              "cli/settings-file"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/introduction",
+              "api/authentication"
+            ]
+          },
+          {
+            "group": "REST API",
+            "pages": [
+              "api/sessions",
+              "api/messages",
+              "api/permissions",
+              "api/machines",
+              "api/git-files",
+              "api/voice",
+              "api/push-notifications"
+            ]
+          },
+          {
+            "group": "WebSocket API",
+            "pages": [
+              "api/socket-overview",
+              "api/socket-events",
+              "api/rpc"
+            ]
+          },
+          {
+            "group": "Server-Sent Events",
+            "pages": [
+              "api/sse"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

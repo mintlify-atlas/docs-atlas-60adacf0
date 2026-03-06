@@ -1,0 +1,489 @@
+---
+title: 'Runner Commands'
+description: 'Manage the background service that runs sessions'
+---
+
+## Overview
+
+The HAPI runner is a background service (daemon) that manages AI agent sessions. It allows you to:
+
+- Keep sessions running even after closing your terminal
+- Spawn new sessions remotely via web/mobile app
+- Manage multiple concurrent sessions
+- Automatically restart sessions on system reboot
+
+## How the Runner Works
+
+The runner operates as a detached background process that:
+
+1. Listens for session spawn requests from the hub
+2. Manages the lifecycle of active sessions
+3. Sends periodic heartbeats to the hub
+4. Cleans up terminated sessions
+5. Maintains state in `~/.hapi/runner.state.json`
+
+<Note>
+  The runner starts automatically when you run `hapi` for the first time. Manual management is optional.
+</Note>
+
+---
+
+## Commands
+
+### hapi runner start
+
+Start the runner as a detached background process.
+
+```bash
+hapi runner start
+```
+
+#### Output Example
+
+```bash
+$ hapi runner start
+Runner started successfully
+```
+
+The runner will continue running in the background even after the terminal closes.
+
+#### Behavior
+
+- Spawns runner as detached process with `stdio: 'ignore'`
+- Waits up to 5 seconds to confirm successful start
+- Exits with error if runner fails to start
+- Safe to run if runner is already running (no-op)
+
+---
+
+### hapi runner stop
+
+Stop the runner gracefully. **Active sessions remain alive.**
+
+```bash
+hapi runner stop
+```
+
+<Note>
+  Stopping the runner does not terminate active sessions. Sessions continue running as independent processes.
+</Note>
+
+#### What Happens
+
+1. Sends shutdown signal to runner process
+2. Runner saves its state
+3. Runner closes HTTP server
+4. Runner exits gracefully
+5. Active sessions keep running
+
+#### To Kill All Processes
+
+If you need to stop both the runner **and** all sessions:
+
+```bash
+hapi doctor clean
+```
+
+---
+
+### hapi runner status
+
+Show detailed runner diagnostics and health information.
+
+```bash
+hapi runner status
+```
+
+This command runs the same diagnostics as `hapi doctor` but focuses on runner-specific information.
+
+#### Output Example
+
+```bash
+$ hapi runner status
+
+✓ Runner Status
+  PID: 12345
+  Version: 0.16.0
+  HTTP Port: 37891
+  Uptime: 2 hours 34 minutes
+  Last Heartbeat: 3 seconds ago
+  Active Sessions: 2
+  Log File: /home/user/.hapi/logs/runner-2026-03-06.log
+
+✓ Runner Health
+  Process alive: yes
+  Version matches: yes
+  State file valid: yes
+```
+
+---
+
+### hapi runner list
+
+List all active sessions currently managed by the runner.
+
+```bash
+hapi runner list
+```
+
+#### Output Example
+
+```bash
+$ hapi runner list
+Active sessions:
+[
+  {
+    "sessionId": "session-claude-abc123",
+    "type": "claude",
+    "pid": 12346,
+    "startTime": "2026-03-06T10:30:00.000Z",
+    "mode": "remote"
+  },
+  {
+    "sessionId": "session-codex-xyz789",
+    "type": "codex",
+    "pid": 12347,
+    "startTime": "2026-03-06T12:15:00.000Z",
+    "mode": "local"
+  }
+]
+```
+
+#### No Active Sessions
+
+```bash
+$ hapi runner list
+No active sessions this runner is aware of (they might have been started by a previous version of the runner)
+```
+
+#### Runner Not Running
+
+```bash
+$ hapi runner list
+No runner running
+```
+
+---
+
+### hapi runner stop-session
+
+Terminate a specific session by its ID.
+
+```bash
+hapi runner stop-session <sessionId>
+```
+
+<ParamField path="sessionId" type="string" required>
+  The unique session ID to terminate. Get session IDs from `hapi runner list`.
+</ParamField>
+
+#### Examples
+
+```bash
+# Stop specific session
+hapi runner stop-session session-claude-abc123
+
+# Output
+Session stopped
+```
+
+#### Errors
+
+```bash
+# Missing session ID
+$ hapi runner stop-session
+Session ID required
+
+# Runner not running
+$ hapi runner stop-session session-abc123
+No runner running
+
+# Session not found or already stopped
+$ hapi runner stop-session session-abc123
+Failed to stop session
+```
+
+---
+
+### hapi runner logs
+
+Print the path to the latest runner log file.
+
+```bash
+hapi runner logs
+```
+
+#### Output Example
+
+```bash
+$ hapi runner logs
+/home/user/.hapi/logs/runner-2026-03-06.log
+```
+
+#### View Logs
+
+Combine with other commands to view or tail logs:
+
+```bash
+# View logs
+cat $(hapi runner logs)
+
+# Tail logs (follow)
+tail -f $(hapi runner logs)
+
+# Search logs
+grep "ERROR" $(hapi runner logs)
+```
+
+#### No Logs Found
+
+```bash
+$ hapi runner logs
+No runner logs found
+```
+
+---
+
+## Runner State File
+
+The runner maintains state in `~/.hapi/runner.state.json` (or `$HAPI_HOME/runner.state.json`).
+
+### State File Structure
+
+```json
+{
+  "pid": 12345,
+  "httpPort": 37891,
+  "startTime": "2026-03-06T08:00:00.000Z",
+  "startedWithCliVersion": "0.16.0",
+  "startedWithCliMtimeMs": 1709712000000,
+  "lastHeartbeat": "2026-03-06T10:30:45.123Z",
+  "runnerLogPath": "/home/user/.hapi/logs/runner-2026-03-06.log"
+}
+```
+
+<ParamField path="pid" type="number">
+  Process ID of the runner daemon
+</ParamField>
+
+<ParamField path="httpPort" type="number">
+  HTTP port used for runner control API
+</ParamField>
+
+<ParamField path="startTime" type="string">
+  ISO timestamp when runner started
+</ParamField>
+
+<ParamField path="startedWithCliVersion" type="string">
+  CLI version that started this runner instance
+</ParamField>
+
+<ParamField path="lastHeartbeat" type="string">
+  ISO timestamp of last heartbeat (updated every 60 seconds by default)
+</ParamField>
+
+<ParamField path="runnerLogPath" type="string">
+  Path to current log file
+</ParamField>
+
+---
+
+## Automatic Runner Management
+
+The runner starts automatically in these scenarios:
+
+### 1. First Session Start
+
+When you run `hapi` (or any session command) for the first time:
+
+```bash
+$ hapi
+[DEBUG] Ensuring hapi background service is running & matches our version...
+[DEBUG] Starting hapi background service...
+✓ Runner started
+✓ Session starting...
+```
+
+### 2. Version Mismatch
+
+If the running runner version doesn't match the installed CLI version, it's automatically restarted:
+
+```bash
+$ hapi
+[DEBUG] Runner version mismatch (0.15.0 vs 0.16.0)
+[DEBUG] Starting updated runner...
+✓ Runner updated to 0.16.0
+```
+
+### 3. Stale or Dead Runner
+
+If the runner state is stale or the process is dead, it's cleaned up and restarted automatically.
+
+---
+
+## Runner Lifecycle
+
+### Startup Sequence
+
+1. Runner process spawned as detached
+2. Loads configuration from environment and settings
+3. Acquires exclusive lock file (`runner.state.json.lock`)
+4. Writes state to `runner.state.json`
+5. Starts HTTP control server on random port
+6. Connects to HAPI hub via Socket.IO
+7. Registers runner with hub
+8. Begins heartbeat loop (every 60 seconds)
+9. Listens for session spawn requests
+
+### Heartbeat
+
+Every 60 seconds (configurable via `HAPI_RUNNER_HEARTBEAT_INTERVAL`):
+
+1. Updates `lastHeartbeat` in state file
+2. Sends heartbeat to hub
+3. Cleans up dead session processes
+
+### Shutdown Sequence
+
+1. Receives shutdown signal (from `hapi runner stop`)
+2. Stops accepting new session requests
+3. Closes HTTP control server
+4. Disconnects from hub
+5. Releases lock file
+6. Exits process
+7. Active sessions continue running independently
+
+---
+
+## Troubleshooting
+
+### Runner Won't Start
+
+**Check if already running:**
+```bash
+hapi runner status
+```
+
+**View logs:**
+```bash
+cat $(hapi runner logs)
+```
+
+**Kill and restart:**
+```bash
+hapi doctor clean
+hapi runner start
+```
+
+### Stale Runner State
+
+If runner state becomes corrupted:
+
+```bash
+# Stop runner
+hapi runner stop
+
+# Remove state file
+rm ~/.hapi/runner.state.json
+rm ~/.hapi/runner.state.json.lock
+
+# Restart
+hapi runner start
+```
+
+### Version Mismatch
+
+If runner and CLI versions don't match:
+
+```bash
+# Runner auto-updates on next session start
+hapi
+
+# Or manually restart runner
+hapi runner stop
+hapi runner start
+```
+
+### Port Already in Use
+
+The runner uses a random available port, so port conflicts are rare. If you encounter issues:
+
+```bash
+# View current port
+hapi runner status
+
+# Stop runner and let it pick new port
+hapi runner stop
+hapi runner start
+```
+
+### Sessions Not Appearing
+
+**Check runner is running:**
+```bash
+hapi runner status
+```
+
+**List active sessions:**
+```bash
+hapi runner list
+```
+
+**Check hub connection:**
+```bash
+hapi auth status
+cat $(hapi runner logs) | grep "Connected to hub"
+```
+
+---
+
+## Advanced Usage
+
+### Custom Heartbeat Interval
+
+```bash
+export HAPI_RUNNER_HEARTBEAT_INTERVAL=30000  # 30 seconds
+hapi runner start
+```
+
+### Custom HTTP Timeout
+
+```bash
+export HAPI_RUNNER_HTTP_TIMEOUT=15000  # 15 seconds
+hapi runner start
+```
+
+### Multiple Runners (Multi-Namespace)
+
+Run separate runners for different HAPI namespaces:
+
+```bash
+# Runner 1
+export HAPI_HOME=~/.hapi-namespace1
+export CLI_API_TOKEN=token1
+hapi runner start
+
+# Runner 2
+export HAPI_HOME=~/.hapi-namespace2
+export CLI_API_TOKEN=token2
+hapi runner start
+```
+
+---
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="Diagnostics" icon="stethoscope" href="/cli/diagnostics">
+    View full system diagnostics including runner status
+  </Card>
+  <Card title="Session Commands" icon="terminal" href="/cli/session-commands">
+    Start sessions managed by the runner
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+- [Diagnostics](/cli/diagnostics) - Full system health check
+- [Environment Variables](/cli/environment-variables) - Configure runner behavior
+- [Settings File](/cli/settings-file) - Understand local storage

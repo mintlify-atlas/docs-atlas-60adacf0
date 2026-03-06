@@ -1,0 +1,583 @@
+---
+title: 'Diagnostics'
+description: 'System diagnostics and troubleshooting for HAPI CLI'
+---
+
+## Overview
+
+The `hapi doctor` command provides comprehensive system diagnostics to help troubleshoot issues with the HAPI CLI, runner, and sessions.
+
+## Commands
+
+### hapi doctor
+
+Run full system diagnostics.
+
+```bash
+hapi doctor
+```
+
+This command checks:
+- CLI version and installation
+- Runner status and health
+- Active HAPI processes
+- Configuration and settings
+- Hub connectivity
+- Log file locations
+- Machine registration
+
+### hapi doctor clean
+
+Kill all runaway HAPI processes.
+
+```bash
+hapi doctor clean
+```
+
+<Warning>
+  This command terminates **all** HAPI-related processes, including:
+  - The runner daemon
+  - All active sessions (Claude, Codex, Cursor, etc.)
+  - Any orphaned processes
+  
+  Use this only when you need to completely reset the HAPI CLI state.
+</Warning>
+
+---
+
+## Doctor Output
+
+### Full Diagnostics
+
+When you run `hapi doctor`, you'll see output like this:
+
+```bash
+$ hapi doctor
+
+✓ HAPI CLI Diagnostics
+
+┌─ CLI Information
+│
+├─ Version: 0.16.0
+├─ Installation: /usr/local/bin/hapi
+├─ Node Version: v20.11.0
+└─ Platform: linux-x64
+
+┌─ Configuration
+│
+├─ HAPI_HOME: /home/user/.hapi
+├─ HAPI_API_URL: http://localhost:3006
+├─ CLI_API_TOKEN: set (from environment)
+├─ Machine ID: machine-abc123
+└─ Experimental Features: disabled
+
+┌─ Runner Status
+│
+├─ Status: running
+├─ PID: 12345
+├─ Version: 0.16.0
+├─ HTTP Port: 37891
+├─ Uptime: 2 hours 34 minutes
+├─ Last Heartbeat: 3 seconds ago
+└─ Active Sessions: 2
+
+┌─ Runner Health
+│
+├─ Process alive: yes
+├─ Version matches: yes
+├─ State file valid: yes
+├─ Lock file present: yes
+└─ Heartbeat recent: yes
+
+┌─ Active Processes
+│
+├─ Runner (PID 12345): 45.2 MB RAM, 0.3% CPU
+├─ Session: claude (PID 12346): 120.5 MB RAM, 2.1% CPU
+└─ Session: codex (PID 12347): 98.3 MB RAM, 1.8% CPU
+
+┌─ Log Files
+│
+├─ Runner: /home/user/.hapi/logs/runner-2026-03-06.log
+├─ Session (claude-abc123): /home/user/.hapi/logs/session-claude-abc123.log
+└─ Session (codex-xyz789): /home/user/.hapi/logs/session-codex-xyz789.log
+
+┌─ Hub Connection
+│
+├─ URL: http://localhost:3006
+├─ Status: connected
+└─ Last ping: 1 second ago
+
+✓ All systems operational
+```
+
+### Problem Detection
+
+When issues are detected, `hapi doctor` provides specific guidance:
+
+```bash
+$ hapi doctor
+
+✗ HAPI CLI Diagnostics
+
+┌─ Runner Status
+│
+├─ Status: not running
+└─ Suggestion: Run 'hapi runner start' to start the runner
+
+┌─ Configuration
+│
+├─ CLI_API_TOKEN: missing
+└─ Suggestion: Run 'hapi auth login' to configure token
+
+┌─ Hub Connection
+│
+├─ URL: http://localhost:3006
+├─ Status: connection refused
+└─ Suggestion: Start the hub with 'hapi hub' or check HAPI_API_URL
+
+✗ Issues detected - follow suggestions above
+```
+
+---
+
+## Clean Output
+
+When you run `hapi doctor clean`, processes are terminated:
+
+```bash
+$ hapi doctor clean
+
+Stopping HAPI processes...
+  ✓ Stopped runner (PID 12345)
+  ✓ Stopped session claude-abc123 (PID 12346)
+  ✓ Stopped session codex-xyz789 (PID 12347)
+
+Cleaned up 3 runaway processes
+```
+
+### With Errors
+
+If some processes cannot be killed:
+
+```bash
+$ hapi doctor clean
+
+Stopping HAPI processes...
+  ✓ Stopped runner (PID 12345)
+  ✗ Failed to stop process 12346: EPERM (permission denied)
+  ✓ Stopped session codex-xyz789 (PID 12347)
+
+Cleaned up 2 runaway processes
+Errors: ["EPERM: operation not permitted, kill 12346"]
+```
+
+**Fix permission errors:**
+```bash
+sudo hapi doctor clean
+```
+
+---
+
+## What Gets Checked
+
+### CLI Version
+
+- Current installed version
+- Installation path
+- Binary modification time
+- Whether CLI executable is valid
+
+### Runner Status
+
+- Whether runner is running
+- Runner process ID (PID)
+- Runner version
+- Whether version matches CLI
+- HTTP control port
+- Uptime since start
+- Last heartbeat timestamp
+- Number of active sessions
+
+### Runner Health
+
+- **Process alive**: Verifies runner PID exists
+- **Version matches**: CLI and runner versions match
+- **State file valid**: `runner.state.json` is readable and valid JSON
+- **Lock file present**: Runner lock file exists
+- **Heartbeat recent**: Last heartbeat within 120 seconds
+
+### Configuration
+
+- `HAPI_HOME` directory path
+- `HAPI_API_URL` setting
+- `CLI_API_TOKEN` status (set or missing)
+- Token source (environment vs settings file)
+- Machine ID
+- Experimental features status
+
+### Active Processes
+
+- All HAPI-related processes (runner + sessions)
+- Process IDs
+- Memory usage (RSS)
+- CPU usage
+- Command line arguments
+
+### Log Files
+
+- Runner log path and size
+- Session log paths and sizes
+- Whether log files are readable
+- Recent log entries (last 10 lines)
+
+### Hub Connection
+
+- Hub URL configuration
+- Connection status (connected/refused/timeout)
+- Last successful ping
+- Socket.IO connection state
+
+---
+
+## Common Issues
+
+### Issue: Runner Not Running
+
+**Diagnostic output:**
+```
+Runner Status: not running
+Suggestion: Run 'hapi runner start'
+```
+
+**Fix:**
+```bash
+hapi runner start
+```
+
+---
+
+### Issue: Version Mismatch
+
+**Diagnostic output:**
+```
+Runner Version: 0.15.0
+CLI Version: 0.16.0
+Version matches: no
+Suggestion: Restart runner to match CLI version
+```
+
+**Fix:**
+```bash
+hapi runner stop
+hapi runner start
+```
+
+Or simply start a new session (runner auto-updates):
+```bash
+hapi
+```
+
+---
+
+### Issue: Stale Heartbeat
+
+**Diagnostic output:**
+```
+Last Heartbeat: 5 minutes ago
+Heartbeat recent: no
+Suggestion: Runner may be frozen - try 'hapi doctor clean'
+```
+
+**Fix:**
+```bash
+hapi doctor clean
+hapi runner start
+```
+
+---
+
+### Issue: Token Not Set
+
+**Diagnostic output:**
+```
+CLI_API_TOKEN: missing
+Token Source: none
+Suggestion: Run 'hapi auth login'
+```
+
+**Fix:**
+```bash
+hapi auth login
+```
+
+Or set environment variable:
+```bash
+export CLI_API_TOKEN=your-token-here
+```
+
+---
+
+### Issue: Cannot Connect to Hub
+
+**Diagnostic output:**
+```
+Hub URL: http://localhost:3006
+Connection Status: connection refused
+Suggestion: Start hub with 'hapi hub' or check HAPI_API_URL
+```
+
+**Fix:**
+
+**Option 1: Start local hub**
+```bash
+hapi hub
+```
+
+**Option 2: Use remote hub**
+```bash
+export HAPI_API_URL=https://your-hub.com
+hapi auth status  # Verify connection
+```
+
+**Option 3: Check firewall**
+```bash
+# Test hub is reachable
+curl http://localhost:3006/health
+```
+
+---
+
+### Issue: Orphaned Sessions
+
+**Diagnostic output:**
+```
+Active Processes:
+  Session: claude (PID 12346): no runner tracking
+  Session: codex (PID 12347): no runner tracking
+
+Suggestion: Orphaned sessions detected - run 'hapi doctor clean'
+```
+
+**Fix:**
+```bash
+hapi doctor clean
+```
+
+---
+
+### Issue: Corrupted State File
+
+**Diagnostic output:**
+```
+Runner Status: error reading state file
+State file valid: no
+Suggestion: Remove corrupted state and restart runner
+```
+
+**Fix:**
+```bash
+# Stop runner if running
+hapi runner stop
+
+# Remove corrupted state
+rm ~/.hapi/runner.state.json
+rm ~/.hapi/runner.state.json.lock
+
+# Restart runner
+hapi runner start
+```
+
+---
+
+## Interpreting Process List
+
+### Process Types
+
+**Runner:**
+```
+Runner (PID 12345): 45.2 MB RAM, 0.3% CPU
+```
+- Background daemon managing sessions
+- Typically low CPU usage
+- Memory usage: 30-60 MB
+
+**Claude Session:**
+```
+Session: claude (PID 12346): 120.5 MB RAM, 2.1% CPU
+```
+- Active Claude Code session
+- Memory usage: 80-200 MB
+- CPU varies based on activity
+
+**Codex Session:**
+```
+Session: codex (PID 12347): 98.3 MB RAM, 1.8% CPU
+```
+- Active Codex session
+- Memory usage: 60-150 MB
+- CPU varies based on activity
+
+**Cursor Session:**
+```
+Session: cursor (PID 12348): 85.0 MB RAM, 1.5% CPU
+```
+- Active Cursor Agent session
+- Memory usage: 50-120 MB
+- CPU varies based on activity
+
+### Normal vs Abnormal
+
+**Normal:**
+- Runner: < 100 MB RAM, < 1% CPU (idle)
+- Sessions: < 300 MB RAM, < 5% CPU (idle)
+- Sessions: < 800 MB RAM, < 50% CPU (active)
+
+**Abnormal (investigate):**
+- Runner: > 200 MB RAM, > 5% CPU
+- Sessions: > 1 GB RAM
+- Sessions: > 90% CPU for extended periods
+- Any process consuming swap memory
+
+---
+
+## Log Inspection
+
+Diagnostics shows log file locations. Inspect them for detailed troubleshooting:
+
+### Runner Logs
+
+```bash
+# View runner logs
+cat $(hapi runner logs)
+
+# Tail runner logs
+tail -f $(hapi runner logs)
+
+# Search for errors
+grep ERROR $(hapi runner logs)
+```
+
+### Session Logs
+
+Session logs are in `~/.hapi/logs/session-*.log`:
+
+```bash
+# List session logs
+ls -lh ~/.hapi/logs/session-*.log
+
+# View specific session
+cat ~/.hapi/logs/session-claude-abc123.log
+
+# Search all sessions for errors
+grep ERROR ~/.hapi/logs/session-*.log
+```
+
+---
+
+## Debug Mode
+
+For verbose diagnostics, enable debug mode:
+
+```bash
+export DEBUG=1
+hapi doctor
+```
+
+This includes:
+- Full stack traces for errors
+- Detailed state file contents
+- HTTP request/response logs
+- Socket.IO connection details
+
+---
+
+## When to Use `doctor clean`
+
+Use `hapi doctor clean` in these scenarios:
+
+### 1. Complete Reset Needed
+
+When you want to stop everything and start fresh:
+```bash
+hapi doctor clean
+hapi runner start
+hapi
+```
+
+### 2. Orphaned Processes
+
+When sessions are running but not tracked by runner:
+```bash
+hapi doctor clean
+```
+
+### 3. Version Upgrades
+
+After upgrading HAPI CLI:
+```bash
+npm update -g @twsxtd/hapi
+hapi doctor clean
+hapi runner start
+```
+
+### 4. State Corruption
+
+When state files are corrupted:
+```bash
+hapi doctor clean
+rm ~/.hapi/runner.state.json*
+hapi runner start
+```
+
+### 5. Frozen Processes
+
+When processes are not responding:
+```bash
+hapi doctor clean
+```
+
+---
+
+## Automated Health Checks
+
+For monitoring HAPI in production, script the doctor command:
+
+```bash
+#!/bin/bash
+# hapi-healthcheck.sh
+
+hapi doctor > /tmp/hapi-doctor.txt 2>&1
+
+if grep -q "All systems operational" /tmp/hapi-doctor.txt; then
+  echo "HAPI healthy"
+  exit 0
+else
+  echo "HAPI issues detected"
+  cat /tmp/hapi-doctor.txt
+  exit 1
+fi
+```
+
+Run via cron:
+```cron
+*/5 * * * * /path/to/hapi-healthcheck.sh
+```
+
+---
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="Runner Commands" icon="server" href="/cli/runner-commands">
+    Manage the runner daemon
+  </Card>
+  <Card title="Authentication" icon="key" href="/cli/auth-commands">
+    Check token and connection status
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+- [Runner Commands](/cli/runner-commands) - Manage background service
+- [Environment Variables](/cli/environment-variables) - Configure HAPI CLI
+- [Settings File](/cli/settings-file) - Understand local storage

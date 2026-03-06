@@ -1,0 +1,722 @@
+---
+title: Agents
+description: Multi-agent support, agent flavors, and agent-specific features in HAPI
+---
+
+## Overview
+
+HAPI is a **multi-agent platform** that wraps multiple AI coding agents and provides unified remote control. Each agent has its own capabilities, permission modes, and integration approach.
+
+<CardGroup cols={3}>
+  <Card title="Claude Code" icon="c">
+    Official Claude CLI with native desktop integration
+  </Card>
+  <Card title="Codex" icon="wand-magic-sparkles">
+    OpenAI-powered agent via custom implementation
+  </Card>
+  <Card title="Cursor Agent" icon="arrow-pointer">
+    Cursor IDE's CLI agent with plan/ask modes
+  </Card>
+  <Card title="Gemini" icon="gem">
+    Google Gemini via Anthropic Code Plugins (ACP)
+  </Card>
+  <Card title="OpenCode" icon="code">
+    OpenCode agent with plugin hook system
+  </Card>
+</CardGroup>
+
+## Agent Flavors
+
+```typescript
+// From shared/src/modes.ts
+type AgentFlavor = 'claude' | 'codex' | 'gemini' | 'opencode' | 'cursor'
+```
+
+Each session has an optional `flavor` field in metadata that identifies the agent type:
+
+```typescript
+type Metadata = {
+  flavor?: string | null  // Agent flavor
+  // ...
+}
+```
+
+<Info>
+Flavor determines which permission modes and model modes are available for the session.
+</Info>
+
+## Claude Code
+
+### Overview
+
+<Card title="Official Claude CLI" icon="c">
+  - Native desktop app integration
+  - Built-in permission system
+  - Plan mode support
+  - Model selection (Sonnet/Opus)
+</Card>
+
+### Integration Approach
+
+HAPI wraps the official `claude` CLI binary:
+
+```bash
+# User runs
+hapi
+
+# HAPI internally runs
+claude --api-url <hub-url> [user flags]
+```
+
+**Key Files:**
+- `cli/src/claude/` - Claude Code integration
+- `cli/src/claude/runClaude.ts` - Main wrapper
+
+### Permission Modes
+
+```typescript
+const CLAUDE_PERMISSION_MODES = [
+  'default',           // Ask for permission on every tool use
+  'acceptEdits',       // Auto-approve file edits, ask for commands
+  'bypassPermissions', // Approve everything (YOLO)
+  'plan'               // Plan mode, describe actions first
+] as const
+```
+
+<Tabs>
+  <Tab title="default">
+    <Card title="Standard Mode" icon="shield">
+      - Ask for permission on every tool use
+      - User approves/denies each action
+      - Safest mode, most control
+    </Card>
+    
+    ```bash
+    hapi --mode default
+    ```
+  </Tab>
+  <Tab title="acceptEdits">
+    <Card title="Edit-Friendly Mode" icon="pen">
+      - Auto-approve file edits
+      - Still ask for command execution
+      - Good for refactoring sessions
+    </Card>
+    
+    ```bash
+    hapi --mode acceptEdits
+    ```
+  </Tab>
+  <Tab title="bypassPermissions">
+    <Card title="YOLO Mode" icon="rocket">
+      - Approve everything automatically
+      - No user intervention required
+      - Use with caution
+    </Card>
+    
+    ```bash
+    hapi --yolo
+    ```
+  </Tab>
+  <Tab title="plan">
+    <Card title="Plan Mode" icon="list-check">
+      - Agent describes actions first
+      - User approves full plan
+      - Then executes without further prompts
+    </Card>
+    
+    ```bash
+    hapi --mode plan
+    ```
+  </Tab>
+</Tabs>
+
+### Model Modes
+
+```typescript
+const MODEL_MODES = ['default', 'sonnet', 'opus'] as const
+```
+
+<CardGroup cols={3}>
+  <Card title="default" icon="robot">
+    Use default model (Sonnet 3.5)
+  </Card>
+  <Card title="sonnet" icon="bolt">
+    Force Sonnet 3.5 (faster)
+  </Card>
+  <Card title="opus" icon="crown">
+    Force Opus (more capable)
+  </Card>
+</CardGroup>
+
+```bash
+# Force Opus model
+hapi --model opus
+```
+
+### Session Management
+
+```bash
+# Start Claude session
+hapi
+
+# Resume existing session
+hapi --resume <sessionId>
+
+# Pass through Claude CLI flags
+hapi --context "Refactor auth module"
+```
+
+## Codex
+
+### Overview
+
+<Card title="OpenAI-Powered Agent" icon="wand-magic-sparkles">
+  - Custom implementation (not official OpenAI CLI)
+  - Read-only and safe-yolo modes
+  - MCP tool integration
+  - Resume support
+</Card>
+
+### Integration Approach
+
+Codex is a custom agent implementation built into the HAPI CLI:
+
+**Key Files:**
+- `cli/src/codex/` - Codex mode integration
+- `cli/src/codex/runCodex.ts` - Main entry point
+- `cli/src/codex/happyMcpStdioBridge.ts` - MCP bridge
+
+### Permission Modes
+
+```typescript
+const CODEX_PERMISSION_MODES = [
+  'default',    // Ask for permission
+  'read-only',  // No file modifications allowed
+  'safe-yolo',  // Auto-approve safe operations
+  'yolo'        // Approve everything
+] as const
+```
+
+<Tabs>
+  <Tab title="default">
+    <Card title="Standard Mode" icon="shield">
+      - Ask for permission on file writes and commands
+      - Allow reads without asking
+    </Card>
+    
+    ```bash
+    hapi codex
+    ```
+  </Tab>
+  <Tab title="read-only">
+    <Card title="Safe Mode" icon="book">
+      - No file modifications allowed
+      - Can read files and analyze code
+      - Good for code review
+    </Card>
+    
+    ```bash
+    hapi codex --read-only
+    ```
+  </Tab>
+  <Tab title="safe-yolo">
+    <Card title="Semi-Autonomous" icon="shield-check">
+      - Auto-approve safe operations
+      - Still ask for risky commands
+    </Card>
+    
+    ```bash
+    hapi codex --safe-yolo
+    ```
+  </Tab>
+  <Tab title="yolo">
+    <Card title="Full Autonomy" icon="rocket">
+      - Approve everything
+      - No user intervention
+    </Card>
+    
+    ```bash
+    hapi codex --yolo
+    ```
+  </Tab>
+</Tabs>
+
+### Commands
+
+```bash
+# Start Codex session
+hapi codex
+
+# Resume existing session
+hapi codex resume <sessionId>
+
+# Start MCP bridge (exposes local tools to Codex)
+hapi mcp
+```
+
+### Model Configuration
+
+Codex does not support runtime model switching. Model is configured via environment variables or defaults.
+
+## Cursor Agent
+
+### Overview
+
+<Card title="Cursor IDE CLI" icon="arrow-pointer">
+  - Official Cursor Agent CLI
+  - Plan and ask modes
+  - Continue from last chat
+  - Local and remote modes
+</Card>
+
+### Integration Approach
+
+HAPI wraps the `agent` CLI from Cursor:
+
+```bash
+# Install Cursor Agent CLI
+# macOS/Linux:
+curl https://cursor.com/install -fsS | bash
+
+# Windows:
+irm 'https://cursor.com/install?win32=true' | iex
+```
+
+**Key Files:**
+- `cli/src/cursor/` - Cursor Agent integration
+- `cli/src/cursor/runCursor.ts` - Main wrapper
+
+### Permission Modes
+
+```typescript
+const CURSOR_PERMISSION_MODES = [
+  'default',  // Ask for permission
+  'plan',     // Plan mode
+  'ask',      // Ask mode
+  'yolo'      // Approve everything
+] as const
+```
+
+<Tabs>
+  <Tab title="default">
+    <Card title="Standard Mode" icon="shield">
+      - Ask for permission on tool use
+    </Card>
+    
+    ```bash
+    hapi cursor
+    ```
+  </Tab>
+  <Tab title="plan">
+    <Card title="Plan Mode" icon="list-check">
+      - Agent creates plan first
+      - User approves plan
+      - Then executes
+    </Card>
+    
+    ```bash
+    hapi cursor --mode plan
+    ```
+  </Tab>
+  <Tab title="ask">
+    <Card title="Ask Mode" icon="question">
+      - Agent asks questions
+      - User provides answers
+      - Agent proceeds based on answers
+    </Card>
+    
+    ```bash
+    hapi cursor --mode ask
+    ```
+  </Tab>
+  <Tab title="yolo">
+    <Card title="YOLO Mode" icon="rocket">
+      - Approve everything
+      - No intervention
+    </Card>
+    
+    ```bash
+    hapi cursor --yolo
+    ```
+  </Tab>
+</Tabs>
+
+### Commands
+
+```bash
+# Start Cursor session
+hapi cursor
+
+# Resume existing session
+hapi cursor resume <chatId>
+
+# Continue from last chat
+hapi cursor --continue
+
+# Set model
+hapi cursor --model gpt-4-turbo
+```
+
+<Info>
+Cursor supports both local and remote modes. In remote mode, it uses `agent -p` with stream-json output.
+</Info>
+
+## Gemini
+
+### Overview
+
+<Card title="Google Gemini via ACP" icon="gem">
+  - Integrated via Anthropic Code Plugins (ACP)
+  - Remote mode only (waits for web/Telegram input)
+  - Tool definitions via ACP protocol
+  - Same permission modes as Codex
+</Card>
+
+### Integration Approach
+
+Gemini runs via the ACP protocol:
+
+**Key Files:**
+- `cli/src/agent/` - Multi-agent support
+- `cli/src/agent/runners/runAgentSession.ts` - ACP session runner
+
+### Permission Modes
+
+```typescript
+const GEMINI_PERMISSION_MODES = [
+  'default',
+  'read-only',
+  'safe-yolo',
+  'yolo'
+] as const
+```
+
+<Note>
+Gemini uses the same permission modes as Codex.
+</Note>
+
+### Commands
+
+```bash
+# Start Gemini session (remote mode only)
+hapi gemini
+
+# Gemini waits for messages from hub/web/Telegram
+# No local mode available
+```
+
+<Warning>
+**Gemini runs in remote mode only.** It does not accept local terminal input. Use the web UI or Telegram to send messages.
+</Warning>
+
+### Model Configuration
+
+Gemini model is configured via environment variables:
+
+```bash
+GEMINI_API_KEY=<key>
+GEMINI_MODEL=gemini-1.5-pro
+```
+
+## OpenCode
+
+### Overview
+
+<Card title="OpenCode via ACP" icon="code">
+  - Integrated via ACP and plugin hooks
+  - Local and remote modes supported
+  - Plugin system for extensibility
+  - Simplified permission modes
+</Card>
+
+### Integration Approach
+
+OpenCode uses ACP + a plugin hook system:
+
+**Key Files:**
+- `cli/src/opencode/` - OpenCode ACP + hook integration
+- `cli/src/opencode/runOpencode.ts` - Main runner
+
+### Permission Modes
+
+```typescript
+const OPENCODE_PERMISSION_MODES = [
+  'default',  // Ask for permission
+  'yolo'      // Approve everything
+] as const
+```
+
+<Info>
+OpenCode has simplified permission modes compared to other agents.
+</Info>
+
+### Commands
+
+```bash
+# Start OpenCode session
+hapi opencode
+
+# OpenCode supports both local and remote modes
+# Local mode streams via OpenCode plugins
+```
+
+## Agent Registry
+
+The CLI maintains an agent registry for session creation:
+
+```typescript
+// Pseudo-code pattern
+const AGENT_REGISTRY = {
+  claude: {
+    run: runClaude,
+    permissionModes: CLAUDE_PERMISSION_MODES,
+    modelModes: MODEL_MODES
+  },
+  codex: {
+    run: runCodex,
+    permissionModes: CODEX_PERMISSION_MODES,
+    modelModes: []
+  },
+  cursor: {
+    run: runCursor,
+    permissionModes: CURSOR_PERMISSION_MODES,
+    modelModes: []
+  },
+  gemini: {
+    run: runAgentSession,
+    permissionModes: GEMINI_PERMISSION_MODES,
+    modelModes: []
+  },
+  opencode: {
+    run: runOpencode,
+    permissionModes: OPENCODE_PERMISSION_MODES,
+    modelModes: []
+  }
+}
+```
+
+## Session Factory Pattern
+
+Each agent follows a common session factory pattern:
+
+<Steps>
+  <Step title="Create API Client">
+    ```typescript
+    const api = await ApiClient.create()
+    ```
+  </Step>
+  <Step title="Get or Create Session">
+    ```typescript
+    const session = await api.getOrCreateSession({
+      tag: workingDir,
+      metadata: { flavor: 'claude', ... },
+      state: null
+    })
+    ```
+  </Step>
+  <Step title="Connect to Hub">
+    ```typescript
+    const syncClient = api.sessionSyncClient(session)
+    await syncClient.connect()
+    ```
+  </Step>
+  <Step title="Start Agent">
+    ```typescript
+    await runAgent({ session, syncClient, ... })
+    ```
+  </Step>
+  <Step title="Register RPC Handlers">
+    ```typescript
+    await syncClient.registerRpcHandler('abort-session', async () => {
+      process.exit(0)
+    })
+    ```
+  </Step>
+</Steps>
+
+## Permission Mode Validation
+
+The shared package provides functions to validate permission modes per agent:
+
+```typescript
+// From shared/src/modes.ts
+function getPermissionModesForFlavor(flavor?: string | null): readonly PermissionMode[] {
+  if (flavor === 'codex') {
+    return CODEX_PERMISSION_MODES
+  }
+  if (flavor === 'gemini') {
+    return GEMINI_PERMISSION_MODES
+  }
+  if (flavor === 'opencode') {
+    return OPENCODE_PERMISSION_MODES
+  }
+  if (flavor === 'cursor') {
+    return CURSOR_PERMISSION_MODES
+  }
+  return CLAUDE_PERMISSION_MODES
+}
+
+function isPermissionModeAllowedForFlavor(
+  mode: PermissionMode,
+  flavor?: string | null
+): boolean {
+  return getPermissionModesForFlavor(flavor).includes(mode)
+}
+```
+
+**Example:**
+
+```typescript
+// Check if 'acceptEdits' is valid for Codex
+const valid = isPermissionModeAllowedForFlavor('acceptEdits', 'codex')
+// Returns: false (Codex doesn't support acceptEdits)
+```
+
+<Warning>
+Always validate permission mode against the session's flavor before setting. Invalid modes are rejected by the Hub.
+</Warning>
+
+## Model Mode Validation
+
+Model modes are only supported for Claude:
+
+```typescript
+function getModelModesForFlavor(flavor?: string | null): readonly ModelMode[] {
+  if (flavor === 'codex' || flavor === 'gemini' || flavor === 'opencode' || flavor === 'cursor') {
+    return []  // No model modes
+  }
+  return MODEL_MODES  // ['default', 'sonnet', 'opus']
+}
+
+function isModelModeAllowedForFlavor(
+  mode: ModelMode,
+  flavor?: string | null
+): boolean {
+  return getModelModesForFlavor(flavor).includes(mode)
+}
+```
+
+## Agent-Specific Session IDs
+
+Each agent stores its own session ID in metadata:
+
+```typescript
+type Metadata = {
+  claudeSessionId?: string
+  codexSessionId?: string
+  geminiSessionId?: string
+  opencodeSessionId?: string
+  cursorSessionId?: string
+  // ...
+}
+```
+
+<Info>
+These IDs are used internally by the agents for state tracking and resumption. They're separate from HAPI's session ID.
+</Info>
+
+## Tool Availability
+
+Each agent exposes different tools:
+
+<Tabs>
+  <Tab title="Claude">
+    ```json
+    {
+      "tools": [
+        "edit_file",
+        "run_command",
+        "read_file",
+        "list_files",
+        "search_files"
+      ]
+    }
+    ```
+  </Tab>
+  <Tab title="Codex">
+    ```json
+    {
+      "tools": [
+        "read_file",
+        "write_file",
+        "execute_command",
+        "list_directory",
+        "search_code"
+      ]
+    }
+    ```
+  </Tab>
+  <Tab title="Gemini">
+    ```json
+    {
+      "tools": [
+        "read_file",
+        "write_file",
+        "execute_command",
+        "list_files"
+      ]
+    }
+    ```
+  </Tab>
+  <Tab title="Cursor/OpenCode">
+    Tools depend on agent configuration and available plugins.
+  </Tab>
+</Tabs>
+
+<Note>
+Tool lists are stored in `metadata.tools` for reference. They're populated during session initialization.
+</Note>
+
+## Choosing an Agent
+
+<CardGroup cols={2}>
+  <Card title="Use Claude" icon="c">
+    **Best for:**
+    - General coding tasks
+    - Native desktop integration
+    - Plan mode workflows
+    - Fine-grained permissions
+  </Card>
+  <Card title="Use Codex" icon="wand-magic-sparkles">
+    **Best for:**
+    - OpenAI enthusiasts
+    - Custom tool integration
+    - Read-only analysis
+    - MCP workflows
+  </Card>
+  <Card title="Use Cursor" icon="arrow-pointer">
+    **Best for:**
+    - Cursor IDE users
+    - Plan/ask mode workflows
+    - IDE-integrated sessions
+  </Card>
+  <Card title="Use Gemini" icon="gem">
+    **Best for:**
+    - Google ecosystem users
+    - Remote-only workflows
+    - Telegram/web control
+  </Card>
+  <Card title="Use OpenCode" icon="code">
+    **Best for:**
+    - Plugin extensibility
+    - Custom workflows
+    - Simplified permissions
+  </Card>
+</CardGroup>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Sessions" href="/concepts/sessions" icon="layer-group">
+    Session metadata and state management
+  </Card>
+  <Card title="How It Works" href="/concepts/how-it-works" icon="circle-play">
+    Session lifecycle and data flow
+  </Card>
+  <Card title="Architecture" href="/concepts/architecture" icon="sitemap">
+    Technical architecture overview
+  </Card>
+  <Card title="Quick Start" href="/quickstart" icon="rocket">
+    Get started with HAPI
+  </Card>
+</CardGroup>

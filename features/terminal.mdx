@@ -1,0 +1,409 @@
+---
+title: Remote Terminal
+description: Access a remote terminal in your coding sessions from any device
+---
+
+HAPI provides remote terminal access to your coding sessions via xterm.js, allowing you to run commands on your development machine from your phone or any web browser.
+
+## Overview
+
+<CardGroup cols={2}>
+  <Card title="Full Terminal Emulator" icon="terminal">
+    xterm.js provides a complete terminal experience in the browser
+  </Card>
+  <Card title="Real-Time Communication" icon="bolt">
+    Commands and output stream via Socket.IO with minimal latency
+  </Card>
+  <Card title="Mobile-Friendly" icon="mobile">
+    Touch keyboard with special keys (Esc, Tab, Ctrl, arrows)
+  </Card>
+  <Card title="Session-Linked" icon="link">
+    Terminal automatically connects to your active session's machine
+  </Card>
+</CardGroup>
+
+## Accessing the Terminal
+
+### From Web App
+
+<Steps>
+  <Step title="Open Session">
+    Navigate to any active session in the web app
+  </Step>
+  <Step title="Terminal Tab">
+    Click the **Terminal** button or navigate to the terminal tab
+  </Step>
+  <Step title="Auto-Connect">
+    Terminal automatically connects to the session's machine
+  </Step>
+  <Step title="Start Typing">
+    Use the terminal as you would locally
+  </Step>
+</Steps>
+
+### Route
+
+The terminal is available at:
+
+```
+/sessions/:sessionId/terminal
+```
+
+## Features
+
+### Full Terminal Emulation
+
+Powered by [xterm.js](https://xtermjs.org/), the terminal supports:
+
+- **256 colors** and true color
+- **Unicode** characters
+- **Cursor positioning** and control sequences
+- **Scrollback buffer** for history
+- **Text selection** and copy/paste
+
+### Touch Keyboard
+
+On mobile, HAPI provides quick-access buttons for special keys:
+
+<CardGroup cols={4}>
+  <Card title="Esc" icon="keyboard">
+    Escape key
+  </Card>
+  <Card title="Tab" icon="keyboard">
+    Tab key for autocomplete
+  </Card>
+  <Card title="Ctrl" icon="keyboard">
+    Control modifier (stays active)
+  </Card>
+  <Card title="Alt" icon="keyboard">
+    Alt/Option modifier
+  </Card>
+</CardGroup>
+
+Additional navigation keys:
+- **Arrow keys** (↑ ↓ ← →)
+- **Home** and **End**
+- **Page Up** and **Page Down**
+
+<Tip>
+Long-press `/` for `?` and `-` for `|` — useful for command options.
+</Tip>
+
+### Paste Functionality
+
+Two ways to paste text:
+
+1. **Automatic**: Tap **Paste** button to use clipboard (if browser supports)
+2. **Manual**: If clipboard unavailable, a dialog appears for manual paste
+
+<Note>
+iOS Safari has clipboard limitations. The manual paste dialog is a reliable fallback.
+</Note>
+
+### Real-Time Updates
+
+Terminal output streams in real-time:
+
+- **Instant feedback** on commands
+- **Live tailing** of logs
+- **Interactive programs** (vim, nano, htop)
+- **Tab completion** works as expected
+
+## Technical Architecture
+
+### Communication Flow
+
+```
+┌─────────────┐         ┌─────────────┐         ┌─────────────┐
+│   Browser   │         │  HAPI Hub   │         │  HAPI CLI   │
+│  (xterm.js) │◄───────►│ (Socket.IO) │◄───────►│   (PTY)     │
+└─────────────┘         └─────────────┘         └─────────────┘
+      │                       │                       │
+      │──terminal:create─────►│──terminal:create─────►│
+      │                       │                       │ spawn shell
+      │                       │◄──terminal:ready──────│
+      │◄──terminal:ready──────│                       │
+      │                       │                       │
+      │──terminal:write──────►│──terminal:write──────►│
+      │      (input)          │                       │ write to PTY
+      │                       │                       │
+      │◄──terminal:output─────│◄──terminal:output─────│
+      │     (stdout)          │                       │ read from PTY
+```
+
+### Components
+
+1. **Browser (xterm.js)**
+   - Renders terminal in browser
+   - Captures keyboard input
+   - Displays output with ANSI colors
+
+2. **Hub (Socket.IO)**
+   - Routes terminal events
+   - Manages terminal registry
+   - Handles connection state
+
+3. **CLI (PTY)**
+   - Spawns shell process
+   - Reads/writes to pseudo-terminal
+   - Handles resize events
+
+### Socket.IO Events
+
+#### Web → CLI
+
+| Event | Description |
+|-------|-------------|
+| `terminal:create` | Request new terminal session |
+| `terminal:write` | Send input to terminal |
+| `terminal:resize` | Update terminal dimensions |
+| `terminal:close` | Close terminal session |
+
+#### CLI → Web
+
+| Event | Description |
+|-------|-------------|
+| `terminal:ready` | Terminal is ready for input |
+| `terminal:output` | Output from terminal |
+| `terminal:exit` | Terminal process exited |
+| `terminal:error` | Error occurred |
+
+## Use Cases
+
+### Quick Command Execution
+
+Run simple commands without switching to terminal:
+
+```bash
+# Check git status
+git status
+
+# Run tests
+npm test
+
+# View logs
+tail -f server.log
+```
+
+### Emergency Fixes
+
+Fix issues while away from your desk:
+
+1. Get notified about production issue
+2. Open terminal on phone
+3. SSH to production server
+4. Apply hotfix
+5. Restart service
+
+### File Management
+
+Manage files when AI can't:
+
+```bash
+# Create directories
+mkdir -p src/components/ui
+
+# Move files
+mv old-file.ts new-file.ts
+
+# Change permissions
+chmod +x deploy.sh
+```
+
+### Interactive Programs
+
+Run interactive CLI tools:
+
+```bash
+# Text editor
+nano config.json
+
+# Interactive git
+git add -p
+
+# Process monitor
+htop
+```
+
+## Connection States
+
+Terminal shows connection status:
+
+<CardGroup cols={3}>
+  <Card title="Connecting" icon="spinner">
+    Establishing Socket.IO connection
+  </Card>
+  <Card title="Connected" icon="check-circle">
+    Ready for input (green indicator)
+  </Card>
+  <Card title="Offline" icon="circle-xmark">
+    Disconnected or session inactive
+  </Card>
+</CardGroup>
+
+### Session Requirements
+
+Terminal is only available when:
+
+- ✅ Session is **active** (agent running)
+- ✅ Machine is **online**
+- ✅ CLI is **connected** to hub
+
+If session is inactive, terminal shows:
+
+```
+Session is inactive. Terminal is unavailable.
+```
+
+## Keyboard Shortcuts
+
+### Desktop
+
+All standard terminal shortcuts work:
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+C` | Interrupt (SIGINT) |
+| `Ctrl+D` | EOF / Exit |
+| `Ctrl+L` | Clear screen |
+| `Ctrl+R` | Reverse search |
+| `Ctrl+A` | Move to start of line |
+| `Ctrl+E` | Move to end of line |
+| `Ctrl+K` | Kill to end of line |
+| `Ctrl+U` | Kill to start of line |
+
+### Mobile
+
+Use the quick-access keyboard:
+
+- **Ctrl button**: Tap to enable, then tap any key for Ctrl+Key
+- **Alt button**: Tap to enable, then tap any key for Alt+Key
+- **Arrow keys**: Navigation without virtual keyboard
+
+<Tip>
+Ctrl and Alt buttons stay highlighted when active. They reset after sending a key combination.
+</Tip>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Session Management">
+    - Keep terminal tab open for continuous connection
+    - Close terminal when done to free resources
+    - One terminal per session (multiple tabs share same PTY)
+  </Accordion>
+
+  <Accordion title="Mobile Usage">
+    - Use landscape mode for more screen space
+    - Rely on quick-access keys for special characters
+    - Use paste dialog for long commands
+  </Accordion>
+
+  <Accordion title="Security">
+    - Terminal has same permissions as CLI process
+    - No isolation — use caution with destructive commands
+    - Consider read-only mode for sensitive environments
+  </Accordion>
+
+  <Accordion title="Performance">
+    - Avoid commands with massive output
+    - Use `head`, `tail`, or `grep` to limit output
+    - Close terminal when not needed
+  </Accordion>
+</AccordionGroup>
+
+## Limitations
+
+<Warning>
+**Known Limitations**:
+
+- **Single terminal per session**: Multiple tabs share the same PTY
+- **No terminal multiplexing**: Use tmux/screen for multiple shells
+- **Session-dependent**: Requires active HAPI session
+- **Limited resize**: Terminal dimensions may not match all programs
+</Warning>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Terminal Not Connecting">
+    **Check**:
+    - Session is active (green indicator)
+    - CLI is connected to hub
+    - Socket.IO connection is established
+    - No firewall blocking WebSocket
+    
+    **Solution**: Refresh page or restart session
+  </Accordion>
+
+  <Accordion title="Input Not Working">
+    **Check**:
+    - Terminal shows "Connected" status
+    - Click terminal area to focus
+    - Try quick-access keys on mobile
+    
+    **Solution**: Tap terminal area or reload page
+  </Accordion>
+
+  <Accordion title="Garbled Output">
+    **Cause**: Terminal size mismatch
+    
+    **Solution**:
+    - Resize browser window
+    - Run `reset` command
+    - Close and reopen terminal
+  </Accordion>
+
+  <Accordion title="Process Exited Unexpectedly">
+    **Displayed**:
+    ```
+    [process exited with code 1]
+    ```
+    
+    **Solution**: Close and reopen terminal tab to spawn new shell
+  </Accordion>
+
+  <Accordion title="Paste Not Working (iOS)">
+    **Cause**: iOS Safari clipboard restrictions
+    
+    **Solution**: Use the manual paste dialog that appears automatically
+  </Accordion>
+</AccordionGroup>
+
+## Security Considerations
+
+### Authentication
+
+- Terminal inherits session authentication
+- Requires valid JWT token
+- No separate terminal password
+
+### Permissions
+
+- Terminal runs as same user as CLI
+- Has access to all files CLI can access
+- No sandboxing or isolation
+
+### Network
+
+- Uses WebSocket (secure if HTTPS)
+- Data is not encrypted beyond TLS
+- Consider VPN for sensitive environments
+
+<Warning>
+Terminal has full access to your machine. Only use on trusted networks or with proper tunneling (Cloudflare Tunnel, Tailscale).
+</Warning>
+
+## Related Features
+
+<CardGroup cols={3}>
+  <Card title="Remote Control" href="/features/remote-control" icon="mobile">
+    Switch between local and remote modes
+  </Card>
+  <Card title="File Browser" href="/features/file-browser" icon="folder">
+    Browse files and view diffs
+  </Card>
+  <Card title="Permissions" href="/features/permissions" icon="shield-check">
+    Control what agents can do
+  </Card>
+</CardGroup>

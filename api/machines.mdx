@@ -1,0 +1,232 @@
+---
+title: Machines
+description: List machines and spawn sessions
+---
+
+## GET /api/machines
+
+List all online machines in the authenticated user's namespace.
+
+**Authentication:** Required
+
+### Response
+
+<ResponseField name="machines" type="array">
+  Array of machine objects
+  <Expandable title="Machine properties">
+    <ResponseField name="id" type="string">
+      Machine ID
+    </ResponseField>
+    <ResponseField name="namespace" type="string">
+      Namespace this machine belongs to
+    </ResponseField>
+    <ResponseField name="metadata" type="object" optional>
+      Machine metadata (hostname, platform, etc.)
+    </ResponseField>
+    <ResponseField name="runnerState" type="object" optional>
+      Runner state information
+    </ResponseField>
+    <ResponseField name="lastSeen" type="number">
+      Unix timestamp (ms) when machine was last seen
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  http://127.0.0.1:3006/api/machines
+```
+
+```json
+{
+  "machines": [
+    {
+      "id": "machine_abc123",
+      "namespace": "default",
+      "metadata": {
+        "hostname": "laptop",
+        "platform": "darwin",
+        "version": "1.0.0"
+      },
+      "lastSeen": 1709856000000
+    }
+  ]
+}
+```
+
+### Errors
+
+- `503` - Hub not connected
+
+---
+
+## POST /api/machines/:id/spawn
+
+Spawn a new session on a specific machine.
+
+**Authentication:** Required
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Machine ID
+</ParamField>
+
+### Request Body
+
+<ParamField body="directory" type="string" required>
+  Working directory path for the new session
+</ParamField>
+
+<ParamField body="agent" type="string" optional>
+  Agent type: `claude`, `codex`, `cursor`, `gemini`, or `opencode` (default: `claude`)
+</ParamField>
+
+<ParamField body="model" type="string" optional>
+  Model identifier (agent-specific)
+</ParamField>
+
+<ParamField body="yolo" type="boolean" optional>
+  Start in YOLO mode (bypass permissions)
+</ParamField>
+
+<ParamField body="sessionType" type="string" optional>
+  Session type: `simple` or `worktree`
+</ParamField>
+
+<ParamField body="worktreeName" type="string" optional>
+  Worktree name (required if sessionType is `worktree`)
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether spawn succeeded
+</ResponseField>
+
+<ResponseField name="sessionId" type="string" optional>
+  ID of the newly spawned session
+</ResponseField>
+
+<ResponseField name="error" type="string" optional>
+  Error message if spawn failed
+</ResponseField>
+
+### Example: Spawn Claude Session
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "directory": "/home/user/myproject",
+    "agent": "claude"
+  }' \
+  http://127.0.0.1:3006/api/machines/machine_abc123/spawn
+```
+
+```json
+{
+  "success": true,
+  "sessionId": "session_xyz789"
+}
+```
+
+### Example: Spawn with YOLO Mode
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "directory": "/home/user/myproject",
+    "agent": "codex",
+    "yolo": true
+  }' \
+  http://127.0.0.1:3006/api/machines/machine_abc123/spawn
+```
+
+### Example: Spawn Worktree Session
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "directory": "/home/user/myproject",
+    "sessionType": "worktree",
+    "worktreeName": "feature-auth"
+  }' \
+  http://127.0.0.1:3006/api/machines/machine_abc123/spawn
+```
+
+### Errors
+
+- `400` - Invalid body
+- `403` - Access denied (machine belongs to different namespace)
+- `404` - Machine not found
+- `503` - Hub not connected
+
+---
+
+## POST /api/machines/:id/paths/exists
+
+Check if multiple paths exist on a machine.
+
+**Authentication:** Required
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Machine ID
+</ParamField>
+
+### Request Body
+
+<ParamField body="paths" type="array" required>
+  Array of paths to check (max 1000)
+</ParamField>
+
+### Response
+
+<ResponseField name="exists" type="object">
+  Object mapping each path to a boolean indicating existence
+</ResponseField>
+
+### Example
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "paths": [
+      "/home/user/project1",
+      "/home/user/project2",
+      "/home/user/project3"
+    ]
+  }' \
+  http://127.0.0.1:3006/api/machines/machine_abc123/paths/exists
+```
+
+```json
+{
+  "exists": {
+    "/home/user/project1": true,
+    "/home/user/project2": false,
+    "/home/user/project3": true
+  }
+}
+```
+
+### Errors
+
+- `400` - Invalid body (empty or too many paths)
+- `403` - Access denied
+- `404` - Machine not found
+- `500` - Failed to check paths
+- `503` - Hub not connected
+
+### Use Cases
+
+- **Validate directory** before spawning a session
+- **Check multiple projects** to show which are available
+- **Detect moved/deleted directories**

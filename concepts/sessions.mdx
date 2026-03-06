@@ -1,0 +1,694 @@
+---
+title: Sessions
+description: Understanding HAPI sessions, metadata, state, and lifecycle
+---
+
+## What is a Session?
+
+A **session** represents a single conversation with an AI coding agent. Each session maintains its own:
+
+<CardGroup cols={2}>
+  <Card title="Conversation History" icon="comments">
+    All messages exchanged between user and agent, with sequence numbers for pagination.
+  </Card>
+  <Card title="Agent State" icon="brain">
+    Current agent status, pending permission requests, and completed actions.
+  </Card>
+  <Card title="Metadata" icon="info-circle">
+    Environment details, working directory, agent flavor, and custom settings.
+  </Card>
+  <Card title="Activity Status" icon="circle-dot">
+    Active/inactive state, thinking indicators, and last activity timestamp.
+  </Card>
+</CardGroup>
+
+## Session Schema
+
+Sessions follow a strict TypeScript schema with Zod validation:
+
+```typescript
+// From shared/src/schemas.ts
+type Session = {
+  // Identity
+  id: string                     // Unique session ID (e.g., 'ses_abc123')
+  namespace: string              // Namespace for multi-user isolation
+  seq: number                    // Database sequence number
+  
+  // Timestamps
+  createdAt: number              // Unix timestamp (ms)
+  updatedAt: number              // Last update timestamp
+  activeAt: number               // Last activity timestamp
+  thinkingAt: number             // Last thinking state change
+  
+  // Status
+  active: boolean                // Is session currently running?
+  thinking: boolean              // Is agent currently processing?
+  
+  // State (versioned)
+  metadata: Metadata | null      // Session metadata
+  metadataVersion: number        // Metadata version for optimistic concurrency
+  agentState: AgentState | null  // Agent state (permissions, control)
+  agentStateVersion: number      // Agent state version
+  
+  // Features
+  todos?: TodoItem[]             // Extracted todo items
+  permissionMode?: PermissionMode // Current permission mode
+  modelMode?: ModelMode          // Current model mode
+}
+```
+
+<Info>
+All sessions are persisted in SQLite and cached in-memory by the Hub for fast access.
+</Info>
+
+## Session Metadata
+
+Metadata describes the session's environment and configuration:
+
+```typescript
+// From shared/src/schemas.ts
+type Metadata = {
+  // Required
+  path: string                   // Working directory
+  host: string                   // Hostname
+  
+  // Optional
+  version?: string               // CLI version
+  name?: string                  // Custom session name
+  os?: string                    // Operating system (e.g., 'darwin', 'linux')
+  
+  // Summary
+  summary?: {
+    text: string                 // AI-generated summary
+    updatedAt: number            // Summary timestamp
+  }
+  
+  // Agent IDs
+  machineId?: string             // Machine ID for remote spawn
+  claudeSessionId?: string       // Claude session ID
+  codexSessionId?: string        // Codex session ID
+  geminiSessionId?: string       // Gemini session ID
+  opencodeSessionId?: string     // OpenCode session ID
+  cursorSessionId?: string       // Cursor session ID
+  
+  // Capabilities
+  tools?: string[]               // Available tools
+  slashCommands?: string[]       // Available slash commands
+  
+  // Paths
+  homeDir?: string               // User home directory
+  happyHomeDir?: string          // HAPI home directory (~/.hapi)
+  happyLibDir?: string           // HAPI library directory
+  happyToolsDir?: string         // HAPI tools directory
+  
+  // Runner context
+  startedFromRunner?: boolean    // Started by runner daemon?
+  hostPid?: number               // Host process ID
+  startedBy?: 'runner' | 'terminal'
+  
+  // Lifecycle
+  lifecycleState?: string        // Current lifecycle state
+  lifecycleStateSince?: number   // State timestamp
+  archivedBy?: string            // Who archived it
+  archiveReason?: string         // Why archived
+  
+  // Agent
+  flavor?: string | null         // Agent flavor (see Agents page)
+  
+  // Git worktree
+  worktree?: {
+    basePath: string             // Base repository path
+    branch: string               // Branch name
+    name: string                 // Worktree name
+    worktreePath?: string        // Full worktree path
+    createdAt?: number           // Creation timestamp
+  }
+}
+```
+
+<Tabs>
+  <Tab title="Example: Claude">
+    ```json
+    {
+      "path": "/home/user/my-project",
+      "host": "macbook-pro.local",
+      "version": "0.2.0",
+      "name": "My Project Session",
+      "os": "darwin",
+      "summary": {
+        "text": "Refactoring authentication module",
+        "updatedAt": 1709735200000
+      },
+      "machineId": "mac_abc123",
+      "claudeSessionId": "claude_xyz789",
+      "tools": ["edit_file", "run_command", "read_file"],
+      "slashCommands": ["/plan", "/help", "/search"],
+      "flavor": "claude"
+    }
+    ```
+  </Tab>
+  <Tab title="Example: Codex">
+    ```json
+    {
+      "path": "/home/user/api-service",
+      "host": "ubuntu-dev",
+      "version": "0.2.0",
+      "os": "linux",
+      "codexSessionId": "codex_def456",
+      "machineId": "ubuntu_def456",
+      "flavor": "codex",
+      "startedFromRunner": true,
+      "startedBy": "runner",
+      "hostPid": 12345
+    }
+    ```
+  </Tab>
+  <Tab title="Example: Gemini">
+    ```json
+    {
+      "path": "/home/user/mobile-app",
+      "host": "workstation",
+      "version": "0.2.0",
+      "os": "linux",
+      "geminiSessionId": "gemini_ghi789",
+      "machineId": "workstation_ghi789",
+      "flavor": "gemini",
+      "tools": ["read_file", "write_file", "execute_command"]
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+Metadata is **read-only from the web perspective**. Only the CLI can update metadata via versioned `update-metadata` Socket.IO events.
+</Note>
+
+## Agent State
+
+Agent state tracks permission requests, user control, and execution history:
+
+```typescript
+// From shared/src/schemas.ts
+type AgentState = {
+  controlledByUser?: boolean     // User has paused agent for manual control
+  requests?: Record<string, AgentStateRequest>
+  completedRequests?: Record<string, AgentStateCompletedRequest>
+}
+```
+
+### Pending Requests
+
+```typescript
+type AgentStateRequest = {
+  tool: string                   // Tool name (e.g., 'edit_file', 'run_command')
+  arguments: unknown             // Tool-specific arguments
+  createdAt?: number             // Request timestamp
+}
+```
+
+**Example:**
+
+```json
+{
+  "req_123": {
+    "tool": "edit_file",
+    "arguments": {
+      "path": "src/auth.ts",
+      "content": "..."
+    },
+    "createdAt": 1709735200000
+  },
+  "req_124": {
+    "tool": "run_command",
+    "arguments": {
+      "command": "npm test"
+    },
+    "createdAt": 1709735210000
+  }
+}
+```
+
+### Completed Requests
+
+```typescript
+type AgentStateCompletedRequest = {
+  tool: string
+  arguments: unknown
+  createdAt?: number
+  completedAt?: number           // Completion timestamp
+  status: 'canceled' | 'denied' | 'approved'
+  reason?: string                // User-provided reason for denial
+  mode?: string                  // Permission mode at time of request
+  decision?: 'approved' | 'approved_for_session' | 'denied' | 'abort'
+  allowTools?: string[]          // Tools approved for rest of session
+  
+  // User answers (for AskUserQuestion / request_user_input)
+  answers?: Record<string, string[]> | Record<string, { answers: string[] }>
+}
+```
+
+**Example:**
+
+```json
+{
+  "req_123": {
+    "tool": "edit_file",
+    "arguments": { "path": "src/auth.ts" },
+    "createdAt": 1709735200000,
+    "completedAt": 1709735205000,
+    "status": "approved",
+    "decision": "approved"
+  },
+  "req_124": {
+    "tool": "run_command",
+    "arguments": { "command": "npm test" },
+    "createdAt": 1709735210000,
+    "completedAt": 1709735215000,
+    "status": "denied",
+    "reason": "Too risky, run locally first",
+    "decision": "denied"
+  }
+}
+```
+
+<Warning>
+Completed requests are kept in history for audit purposes. They can grow large over time. Consider archiving old sessions.
+</Warning>
+
+## Session States
+
+### Active vs Inactive
+
+<Tabs>
+  <Tab title="Active">
+    <Card title="Session is Running" icon="circle-play">
+      - CLI is connected and alive
+      - Agent can receive and process messages
+      - Thinking indicator may be on/off
+      - Appears at top of session list in web UI
+    </Card>
+    
+    ```typescript
+    {
+      "active": true,
+      "activeAt": 1709735200000,
+      "thinking": true,
+      "thinkingAt": 1709735195000
+    }
+    ```
+  </Tab>
+  <Tab title="Inactive">
+    <Card title="Session has Ended" icon="circle-stop">
+      - CLI disconnected or session explicitly ended
+      - Agent cannot receive messages
+      - Appears in inactive section of web UI
+      - Can be resumed if runner is available
+    </Card>
+    
+    ```typescript
+    {
+      "active": false,
+      "activeAt": 1709735100000,  // Last active time
+      "thinking": false,
+      "thinkingAt": 1709735100000
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Lifecycle States
+
+Optional lifecycle tracking via `metadata.lifecycleState`:
+
+<Steps>
+  <Step title="initializing">
+    Session is being created, CLI connecting to Hub.
+  </Step>
+  <Step title="running">
+    Session is active and processing.
+  </Step>
+  <Step title="paused">
+    User paused agent for manual control (`controlledByUser: true`).
+  </Step>
+  <Step title="completed">
+    Agent finished task, session ended normally.
+  </Step>
+  <Step title="aborted">
+    User aborted session manually.
+  </Step>
+  <Step title="archived">
+    Session archived by user (inactive + archived flag).
+  </Step>
+</Steps>
+
+<Info>
+Lifecycle state is optional and implementation-specific. Not all agents track it.
+</Info>
+
+## Session Modes
+
+Sessions operate in two modes that can be switched dynamically:
+
+<Tabs>
+  <Tab title="Local Mode">
+    <Card title="Terminal Control" icon="terminal">
+      - User types directly in terminal
+      - Agent responses stream to terminal UI
+      - Full syntax highlighting and interactivity
+      - Optimal for focused coding sessions
+    </Card>
+    
+    **When in local mode:**
+    - `session-alive` event includes `mode: 'local'`
+    - CLI processes user input from terminal stdin
+    - Web can view but not send messages (read-only)
+  </Tab>
+  <Tab title="Remote Mode">
+    <Card title="Web/Phone Control" icon="mobile">
+      - User sends messages from web/PWA/Telegram
+      - Agent responses broadcast via SSE
+      - Permission approval on the go
+      - Optimal for monitoring and approvals
+    </Card>
+    
+    **When in remote mode:**
+    - `session-alive` event includes `mode: 'remote'`
+    - CLI waits for messages from Hub
+    - Terminal shows "Remote mode - waiting for input"
+    - Web can send messages normally
+  </Tab>
+</Tabs>
+
+<Check>
+Mode switching is instant and preserves all session state. See the [How It Works](/concepts/how-it-works) page for details.
+</Check>
+
+## Session Control
+
+### Abort Session
+
+Terminate an active session:
+
+```bash
+# REST API
+POST /api/sessions/:id/abort
+
+# Result
+# - CLI terminates agent process
+# - Session becomes inactive
+# - active = false
+# - Hub broadcasts session-updated event
+```
+
+### Switch to Remote
+
+Force session into remote mode:
+
+```bash
+# REST API
+POST /api/sessions/:id/switch
+
+# Result
+# - CLI switches to remote mode
+# - Terminal shows "Remote mode - waiting for input"
+# - Web can now send messages
+```
+
+### Resume Session
+
+Restart an inactive session (requires runner):
+
+```bash
+# REST API
+POST /api/sessions/:id/resume
+
+# Requirements
+# - Original machine must be online
+# - Machine must have runner daemon running
+# - Session must be inactive
+
+# Result
+# - Runner spawns new CLI process with session ID
+# - Session becomes active again
+# - Agent continues from last state
+```
+
+<Warning>
+Resume only works if the original machine has `hapi runner start` running. Otherwise, the API returns an error.
+</Warning>
+
+### Archive Session
+
+Mark a session as archived:
+
+```bash
+# REST API
+POST /api/sessions/:id/archive
+
+# Result
+# - metadata.lifecycleState = 'archived'
+# - metadata.archivedBy = user ID
+# - metadata.archiveReason = reason string
+# - Session hidden from default views
+```
+
+### Delete Session
+
+Permanently delete an inactive session:
+
+```bash
+# REST API
+DELETE /api/sessions/:id
+
+# Requirements
+# - Session must be inactive
+
+# Result
+# - Session and all messages deleted from SQLite
+# - Cache entry removed
+# - Hub broadcasts session-removed event
+```
+
+<Warning>
+Deletion is permanent and cannot be undone. Archive instead if you want to keep history.
+</Warning>
+
+## Permission Modes
+
+Each session can have a permission mode that controls how agent tool requests are handled:
+
+```typescript
+// From shared/src/modes.ts
+type PermissionMode =
+  | 'default'            // Ask for permission (default)
+  | 'acceptEdits'        // Auto-approve edits (Claude)
+  | 'bypassPermissions'  // Approve everything (Claude YOLO)
+  | 'plan'               // Plan mode (Claude/Cursor)
+  | 'ask'                // Ask mode (Cursor)
+  | 'read-only'          // No file changes (Codex/Gemini)
+  | 'safe-yolo'          // Auto-approve safe operations (Codex/Gemini)
+  | 'yolo'               // Approve everything (all agents)
+```
+
+<Tabs>
+  <Tab title="Claude">
+    ```typescript
+    const CLAUDE_PERMISSION_MODES = ['default', 'acceptEdits', 'bypassPermissions', 'plan']
+    ```
+    
+    - **default**: Ask for permission on every tool use
+    - **acceptEdits**: Auto-approve file edits, ask for commands
+    - **bypassPermissions**: Approve everything (YOLO)
+    - **plan**: Plan mode, agent describes actions first
+  </Tab>
+  <Tab title="Codex/Gemini">
+    ```typescript
+    const CODEX_PERMISSION_MODES = ['default', 'read-only', 'safe-yolo', 'yolo']
+    const GEMINI_PERMISSION_MODES = ['default', 'read-only', 'safe-yolo', 'yolo']
+    ```
+    
+    - **default**: Ask for permission
+    - **read-only**: No file modifications allowed
+    - **safe-yolo**: Auto-approve safe operations
+    - **yolo**: Approve everything
+  </Tab>
+  <Tab title="Cursor">
+    ```typescript
+    const CURSOR_PERMISSION_MODES = ['default', 'plan', 'ask', 'yolo']
+    ```
+    
+    - **default**: Ask for permission
+    - **plan**: Plan mode
+    - **ask**: Ask mode
+    - **yolo**: Approve everything
+  </Tab>
+  <Tab title="OpenCode">
+    ```typescript
+    const OPENCODE_PERMISSION_MODES = ['default', 'yolo']
+    ```
+    
+    - **default**: Ask for permission
+    - **yolo**: Approve everything
+  </Tab>
+</Tabs>
+
+**Set permission mode via API:**
+
+```bash
+POST /api/sessions/:id/permission-mode
+Content-Type: application/json
+
+{
+  "mode": "acceptEdits"
+}
+```
+
+<Info>
+Permission mode is persisted in the session and survives restarts. The CLI respects the mode for all tool requests.
+</Info>
+
+## Model Modes
+
+Sessions can specify a preferred model (Claude only):
+
+```typescript
+// From shared/src/modes.ts
+type ModelMode = 'default' | 'sonnet' | 'opus'
+```
+
+<CardGroup cols={3}>
+  <Card title="default" icon="robot">
+    Use the default model (usually Sonnet 3.5)
+  </Card>
+  <Card title="sonnet" icon="bolt">
+    Force Sonnet 3.5 (faster, cheaper)
+  </Card>
+  <Card title="opus" icon="crown">
+    Force Opus (slower, more capable)
+  </Card>
+</CardGroup>
+
+**Set model mode via API:**
+
+```bash
+POST /api/sessions/:id/model
+Content-Type: application/json
+
+{
+  "model": "opus"
+}
+```
+
+<Note>
+Model mode only applies to Claude agents. Codex, Gemini, Cursor, and OpenCode use their own model configuration.
+</Note>
+
+## Session Tags
+
+Sessions are identified by a **tag** which is typically the working directory path. The CLI uses tags to resume sessions:
+
+```typescript
+// CLI creates or resumes session by tag
+const session = await api.getOrCreateSession({
+  tag: '/home/user/my-project',
+  metadata: { ... },
+  state: null
+})
+
+// Hub returns existing session if tag matches
+// Otherwise, creates a new session
+```
+
+<Info>
+Tags enable session persistence. Running `hapi` in the same directory resumes the existing session instead of creating a new one.
+</Info>
+
+## Todo Items
+
+Sessions can extract and track todo items from agent messages:
+
+```typescript
+// From shared/src/schemas.ts
+type TodoItem = {
+  id: string                     // Unique todo ID
+  content: string                // Todo text
+  status: 'pending' | 'in_progress' | 'completed'
+  priority: 'high' | 'medium' | 'low'
+}
+```
+
+**Example:**
+
+```json
+[
+  {
+    "id": "todo_1",
+    "content": "Refactor authentication module",
+    "status": "in_progress",
+    "priority": "high"
+  },
+  {
+    "id": "todo_2",
+    "content": "Add error handling",
+    "status": "pending",
+    "priority": "medium"
+  },
+  {
+    "id": "todo_3",
+    "content": "Write unit tests",
+    "status": "completed",
+    "priority": "low"
+  }
+]
+```
+
+<Check>
+Todos are extracted from agent messages that contain TodoWrite tool calls. The Hub backfills todos from message history on first access.
+</Check>
+
+## Namespace Isolation
+
+Sessions are isolated by namespace for multi-user support:
+
+```typescript
+// Each session belongs to a namespace
+type Session = {
+  namespace: string  // e.g., 'default', 'team-a', 'user-123'
+  // ...
+}
+
+// Hub filters sessions by namespace
+function getSessionsByNamespace(namespace: string): Session[] {
+  return sessions.filter(s => s.namespace === namespace)
+}
+```
+
+<Warning>
+Namespaces are enforced at the Hub level. Clients cannot access sessions from other namespaces, even if they know the session ID.
+</Warning>
+
+**Set namespace via token:**
+
+```bash
+# CLI and web both append namespace to token
+CLI_API_TOKEN=secret:my-namespace
+
+# Hub extracts namespace from token and assigns to session
+```
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="How It Works" href="/concepts/how-it-works" icon="circle-play">
+    Session lifecycle and data flow
+  </Card>
+  <Card title="Architecture" href="/concepts/architecture" icon="sitemap">
+    Technical architecture overview
+  </Card>
+  <Card title="Agents" href="/concepts/agents" icon="robot">
+    Multi-agent support and flavors
+  </Card>
+  <Card title="API Reference" href="/api/sessions" icon="code">
+    REST API endpoints for sessions
+  </Card>
+</CardGroup>

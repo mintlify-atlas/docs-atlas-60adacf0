@@ -1,0 +1,249 @@
+---
+title: OpenCode
+description: Run OpenCode sessions with HAPI remote control
+---
+
+## Overview
+
+OpenCode mode integrates the OpenCode AI coding agent with HAPI through the Anthropic Code Plugins (ACP) protocol and OpenCode's plugin hook system. Run OpenCode sessions with remote control via web and Telegram.
+
+<Info>
+  OpenCode supports both local and remote modes. Local mode streams via OpenCode plugins.
+</Info>
+
+## Requirements
+
+- OpenCode CLI installed (`opencode` on PATH)
+- HAPI CLI installed (`hapi` command available)
+- Authenticated with HAPI hub (`hapi auth login`)
+
+## Starting a Session
+
+### Basic Usage
+
+```bash
+hapi opencode              # Start new OpenCode session
+hapi opencode --resume <id>  # Resume existing session
+```
+
+### With Options
+
+```bash
+hapi opencode --yolo                      # Bypass approval prompts
+hapi opencode --hapi-starting-mode remote # Start in remote mode
+hapi opencode --resume session_abc123     # Resume specific session
+```
+
+## Available Flags
+
+| Flag | Description |
+|------|-------------|
+| `--resume <sessionId>` | Resume a specific OpenCode session |
+| `--yolo` | Bypass approval prompts |
+| `--hapi-starting-mode` | Set initial mode: `local` or `remote` |
+| `--started-by` | Internal flag for runner management |
+
+## Permission Modes
+
+OpenCode supports these permission modes:
+
+<CardGroup cols={2}>
+  <Card title="Default" icon="shield-check">
+    Standard behavior with approval prompts
+  </Card>
+  <Card title="Yolo" icon="triangle-exclamation">
+    Bypass all approval prompts (use with caution)
+  </Card>
+</CardGroup>
+
+Change permission modes from the web UI during an active session.
+
+See `shared/src/modes.ts:10-11` for mode definitions.
+
+<Info>
+  OpenCode currently supports a simplified permission model with `default` and `yolo` modes.
+</Info>
+
+## Session Modes
+
+### Local Mode
+
+Full interactive experience from terminal:
+
+```bash
+hapi opencode
+```
+
+In local mode:
+- Direct terminal interaction with OpenCode
+- Streams via OpenCode plugins
+- Real-time responses
+- Messages from web/phone are queued
+- Full plugin hook system available
+
+### Remote Mode
+
+Control entirely from web/phone:
+
+```bash
+hapi opencode --hapi-starting-mode remote
+```
+
+In remote mode:
+- Session waits for messages from hub UI/Telegram
+- No terminal interaction required
+- Uses ACP protocol
+- OpenCode plugin hooks available
+
+## Resume Functionality
+
+OpenCode sessions can be resumed by session ID:
+
+```bash
+hapi opencode --resume session_abc123
+```
+
+To find session IDs:
+- Check the web UI session list
+- Use `hapi runner list` to see active sessions
+- Session IDs are displayed when starting a session
+
+## ACP Integration
+
+OpenCode integrates via the ACP (Anthropic Code Plugins) protocol:
+
+- Runs as an ACP-compatible agent
+- Uses OpenCode's plugin hook system
+- Supports standard coding tools and operations
+- Managed by the HAPI agent runner system
+- See `cli/src/opencode/runOpencode.ts` for implementation
+
+## Plugin Hook System
+
+OpenCode uses a plugin hook system for extensibility:
+
+- Hooks into OpenCode's plugin architecture
+- Streams events in local mode
+- Integrates with HAPI's remote control
+- Supports custom plugin development
+
+## Examples
+
+### Start New Session
+
+```bash
+hapi opencode
+```
+
+### Resume Existing Session
+
+```bash
+hapi opencode --resume session_abc123
+```
+
+### Start in Remote Mode
+
+```bash
+hapi opencode --hapi-starting-mode remote
+```
+
+Then control from the web UI or Telegram.
+
+### Start with Yolo Mode
+
+```bash
+hapi opencode --yolo
+```
+
+<Warning>
+  Yolo mode bypasses all approval prompts. Use only in trusted environments.
+</Warning>
+
+## Integration
+
+Once running, your OpenCode session appears in:
+- HAPI web app
+- Telegram Mini App
+
+You can:
+- Monitor session activity in real-time
+- Approve operations from your phone
+- Send messages to the agent
+- Switch between local and remote modes
+- Change permission modes on the fly
+- View file changes and diffs
+
+## Workflow
+
+### Local Mode Workflow
+
+1. **Start Session**
+   ```bash
+   hapi opencode
+   ```
+
+2. **Interact in Terminal**
+   - Type your coding requests
+   - OpenCode responds interactively
+   - Approve operations as needed
+
+3. **Monitor in Web UI**
+   - View session in web app
+   - See real-time updates
+   - Queue messages for later
+
+### Remote Mode Workflow
+
+1. **Start Session**
+   ```bash
+   hapi opencode --hapi-starting-mode remote
+   ```
+
+2. **Open Web UI**
+   - Navigate to your HAPI hub URL
+   - Find the new OpenCode session
+
+3. **Send Messages**
+   - Type your coding request
+   - OpenCode processes and responds
+   - Approve any required operations
+
+4. **Monitor Progress**
+   - View real-time updates
+   - Check file changes
+   - Review diffs
+
+## Mode Switching
+
+Switch between local and remote modes anytime:
+
+- **From Local to Remote**: Use the web UI to switch
+- **From Remote to Local**: Rejoin the terminal session
+
+The session context is preserved across mode switches.
+
+## Related Commands
+
+```bash
+hapi auth status        # Check authentication
+hapi runner start       # Start background service
+hapi runner status      # View runner status
+hapi runner list        # List active sessions
+hapi doctor             # Run diagnostics
+```
+
+## OpenCode CLI
+
+HAPI wraps the OpenCode CLI. For OpenCode-specific options:
+
+```bash
+opencode --help
+```
+
+Most OpenCode flags can be passed through HAPI.
+
+## Source Reference
+
+- Command implementation: `cli/src/commands/opencode.ts`
+- Session runner: `cli/src/opencode/runOpencode.ts`
+- Permission modes: `shared/src/modes.ts:10-11`

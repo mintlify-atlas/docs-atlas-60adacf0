@@ -1,0 +1,416 @@
+---
+title: Git & Files
+description: Access git status, diffs, and file contents
+---
+
+## GET /api/sessions/:id/git-status
+
+Get git status for a session's working directory.
+
+**Authentication:** Required
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Session ID
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether the operation succeeded
+</ResponseField>
+
+<ResponseField name="files" type="array" optional>
+  Array of changed files with status
+</ResponseField>
+
+<ResponseField name="branch" type="string" optional>
+  Current branch name
+</ResponseField>
+
+<ResponseField name="error" type="string" optional>
+  Error message if failed
+</ResponseField>
+
+### Example
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  http://127.0.0.1:3006/api/sessions/abc123/git-status
+```
+
+```json
+{
+  "success": true,
+  "branch": "main",
+  "files": [
+    {
+      "path": "src/main.ts",
+      "status": "modified"
+    },
+    {
+      "path": "README.md",
+      "status": "modified"
+    },
+    {
+      "path": "test.ts",
+      "status": "untracked"
+    }
+  ]
+}
+```
+
+### Errors
+
+- `403` - Access denied
+- `404` - Session not found
+- `503` - Hub not connected
+
+---
+
+## GET /api/sessions/:id/git-diff-numstat
+
+Get git diff summary with line count statistics.
+
+**Authentication:** Required
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Session ID
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="staged" type="boolean" optional>
+  Show only staged changes (default: false shows unstaged)
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether the operation succeeded
+</ResponseField>
+
+<ResponseField name="files" type="array" optional>
+  Array of file change statistics
+  <Expandable title="File stat properties">
+    <ResponseField name="path" type="string">
+      File path
+    </ResponseField>
+    <ResponseField name="added" type="number">
+      Lines added
+    </ResponseField>
+    <ResponseField name="removed" type="number">
+      Lines removed
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="error" type="string" optional>
+  Error message if failed
+</ResponseField>
+
+### Example
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  "http://127.0.0.1:3006/api/sessions/abc123/git-diff-numstat?staged=false"
+```
+
+```json
+{
+  "success": true,
+  "files": [
+    {
+      "path": "src/main.ts",
+      "added": 15,
+      "removed": 3
+    },
+    {
+      "path": "README.md",
+      "added": 5,
+      "removed": 1
+    }
+  ]
+}
+```
+
+---
+
+## GET /api/sessions/:id/git-diff-file
+
+Get git diff for a specific file.
+
+**Authentication:** Required
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Session ID
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="path" type="string" required>
+  File path to diff
+</ParamField>
+
+<ParamField query="staged" type="boolean" optional>
+  Show staged diff (default: false shows unstaged)
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether the operation succeeded
+</ResponseField>
+
+<ResponseField name="diff" type="string" optional>
+  Unified diff output
+</ResponseField>
+
+<ResponseField name="error" type="string" optional>
+  Error message if failed
+</ResponseField>
+
+### Example
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  "http://127.0.0.1:3006/api/sessions/abc123/git-diff-file?path=src/main.ts&staged=false"
+```
+
+```json
+{
+  "success": true,
+  "diff": "diff --git a/src/main.ts b/src/main.ts\nindex 1234567..abcdefg 100644\n--- a/src/main.ts\n+++ b/src/main.ts\n@@ -10,3 +10,5 @@\n console.log('Hello')\n+console.log('World')\n"
+}
+```
+
+---
+
+## GET /api/sessions/:id/file
+
+Read the contents of a file in the session's working directory.
+
+**Authentication:** Required
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Session ID
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="path" type="string" required>
+  Relative path to the file
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether the operation succeeded
+</ResponseField>
+
+<ResponseField name="content" type="string" optional>
+  File contents
+</ResponseField>
+
+<ResponseField name="error" type="string" optional>
+  Error message if failed
+</ResponseField>
+
+### Example
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  "http://127.0.0.1:3006/api/sessions/abc123/file?path=src/main.ts"
+```
+
+```json
+{
+  "success": true,
+  "content": "console.log('Hello World');\n"
+}
+```
+
+### Errors
+
+- `400` - Invalid file path
+- `403` - Access denied
+- `404` - Session not found
+- `503` - Hub not connected
+
+---
+
+## GET /api/sessions/:id/files
+
+Search for files in the session's working directory using ripgrep.
+
+**Authentication:** Required
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Session ID
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="query" type="string" optional>
+  Search pattern (filename glob)
+</ParamField>
+
+<ParamField query="limit" type="number" optional>
+  Maximum number of results (1-500, default: 200)
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether the operation succeeded
+</ResponseField>
+
+<ResponseField name="files" type="array" optional>
+  Array of file objects
+  <Expandable title="File properties">
+    <ResponseField name="fileName" type="string">
+      Base filename
+    </ResponseField>
+    <ResponseField name="filePath" type="string">
+      Directory path
+    </ResponseField>
+    <ResponseField name="fullPath" type="string">
+      Complete path
+    </ResponseField>
+    <ResponseField name="fileType" type="string">
+      Always "file"
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="error" type="string" optional>
+  Error message if failed
+</ResponseField>
+
+### Example: List All Files
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  "http://127.0.0.1:3006/api/sessions/abc123/files?limit=50"
+```
+
+```json
+{
+  "success": true,
+  "files": [
+    {
+      "fileName": "main.ts",
+      "filePath": "src",
+      "fullPath": "src/main.ts",
+      "fileType": "file"
+    },
+    {
+      "fileName": "README.md",
+      "filePath": "",
+      "fullPath": "README.md",
+      "fileType": "file"
+    }
+  ]
+}
+```
+
+### Example: Search for TypeScript Files
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  "http://127.0.0.1:3006/api/sessions/abc123/files?query=.ts&limit=100"
+```
+
+```json
+{
+  "success": true,
+  "files": [
+    {
+      "fileName": "main.ts",
+      "filePath": "src",
+      "fullPath": "src/main.ts",
+      "fileType": "file"
+    },
+    {
+      "fileName": "test.ts",
+      "filePath": "tests",
+      "fullPath": "tests/test.ts",
+      "fileType": "file"
+    }
+  ]
+}
+```
+
+### Errors
+
+- `400` - Invalid query
+- `403` - Access denied
+- `404` - Session not found
+- `503` - Hub not connected
+
+---
+
+## GET /api/sessions/:id/directory
+
+List contents of a directory in the session's working directory.
+
+**Authentication:** Required
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Session ID
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="path" type="string" optional>
+  Relative directory path (empty = root)
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether the operation succeeded
+</ResponseField>
+
+<ResponseField name="entries" type="array" optional>
+  Array of directory entries (files and directories)
+</ResponseField>
+
+<ResponseField name="error" type="string" optional>
+  Error message if failed
+</ResponseField>
+
+### Example
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  "http://127.0.0.1:3006/api/sessions/abc123/directory?path=src"
+```
+
+```json
+{
+  "success": true,
+  "entries": [
+    {
+      "name": "main.ts",
+      "type": "file",
+      "size": 1024
+    },
+    {
+      "name": "utils",
+      "type": "directory"
+    }
+  ]
+}
+```

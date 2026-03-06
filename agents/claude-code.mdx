@@ -1,0 +1,184 @@
+---
+title: Claude Code
+description: Run Claude Code sessions with remote control via HAPI
+---
+
+## Overview
+
+HAPI wraps the Claude Code CLI to provide remote control capabilities through web and Telegram. Start sessions from your terminal and monitor/control them from anywhere.
+
+## Requirements
+
+- Claude Code CLI installed and logged in (`claude` on PATH)
+- HAPI CLI installed (`hapi` command available)
+- Authenticated with HAPI hub (`hapi auth login`)
+
+## Starting a Session
+
+### Basic Usage
+
+```bash
+hapi                    # Start Claude Code session
+hapi --resume           # Resume the most recent session
+```
+
+### With Options
+
+```bash
+hapi --yolo             # Bypass permissions (sugar for --dangerously-skip-permissions)
+hapi --model opus       # Use a specific model
+hapi --hapi-starting-mode remote  # Start in remote mode
+```
+
+<Info>
+  HAPI supports **ALL** Claude Code CLI flags! Use any `claude` flag with `hapi` as you would normally.
+</Info>
+
+## Available Flags
+
+### HAPI-Specific Flags
+
+| Flag | Description |
+|------|-------------|
+| `--hapi-starting-mode` | Set initial mode: `local` or `remote` |
+| `--yolo` | Bypass permissions (alias for `--dangerously-skip-permissions`) |
+| `--started-by` | Internal flag for runner management |
+
+### Claude Code Flags
+
+All standard Claude Code flags are supported:
+
+- `--resume` - Resume the most recent session
+- `--model <model>` - Specify model (sonnet, opus, etc.)
+- `--dangerously-skip-permissions` - Bypass all permission prompts
+- And all other `claude` flags
+
+Run `hapi --help` to see the full list.
+
+## Permission Modes
+
+Claude Code supports these permission modes:
+
+<CardGroup cols={2}>
+  <Card title="Default" icon="shield-check">
+    Standard Claude behavior with permission prompts
+  </Card>
+  <Card title="Accept Edits" icon="pen-to-square">
+    Automatically accept edit operations
+  </Card>
+  <Card title="Plan Mode" icon="list-check">
+    Design approach before implementing changes
+  </Card>
+  <Card title="Yolo" icon="triangle-exclamation">
+    Bypass all permissions (use with caution)
+  </Card>
+</CardGroup>
+
+Change permission modes from the web UI during an active session.
+
+See `shared/src/modes.ts:1` for mode definitions.
+
+## Session Modes
+
+### Local Mode
+
+Start from terminal with full interactive experience:
+
+```bash
+hapi
+```
+
+In local mode:
+- Full terminal interaction with Claude
+- Messages from web/phone are queued
+- Switch to remote mode anytime from the UI
+
+### Remote Mode
+
+Control entirely from web/phone:
+
+```bash
+hapi --hapi-starting-mode remote
+```
+
+In remote mode:
+- Session waits for messages from hub UI/Telegram
+- No terminal interaction
+- Switch to local mode anytime from the UI
+
+## Resume Functionality
+
+Claude Code has built-in session resume:
+
+```bash
+# Resume most recent session
+hapi --resume
+
+# Any other Claude resume flags work too
+```
+
+Sessions automatically register with HAPI hub, allowing you to:
+- View session history in web UI
+- Continue conversations from any device
+- Track all interactions
+
+## Examples
+
+### Start Standard Session
+
+```bash
+hapi
+```
+
+### Resume Previous Session
+
+```bash
+hapi --resume
+```
+
+### Start with Auto-Accept Edits
+
+```bash
+hapi --yolo
+```
+
+### Start with Specific Model
+
+```bash
+hapi --model opus
+```
+
+### Start in Remote Mode
+
+```bash
+hapi --hapi-starting-mode remote
+```
+
+Then control entirely from the web app or Telegram.
+
+## Integration
+
+Once running, your Claude Code session appears in:
+- HAPI web app
+- Telegram Mini App
+
+You can:
+- Monitor session activity in real-time
+- Approve permissions from your phone
+- Send messages (queued in local mode)
+- Switch between local and remote modes
+- Change permission modes on the fly
+
+## Related Commands
+
+```bash
+hapi auth status        # Check authentication
+hapi runner status      # View background service status
+hapi doctor             # Run diagnostics
+```
+
+## Source Reference
+
+- Command implementation: `cli/src/commands/claude.ts`
+- Session runner: `cli/src/claude/runClaude.ts`
+- Permission modes: `shared/src/modes.ts:1-4`

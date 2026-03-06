@@ -1,0 +1,121 @@
+---
+title: API Introduction
+description: Overview of the HAPI REST API, WebSocket API, and SSE
+---
+
+## Overview
+
+HAPI Hub provides three types of APIs for interacting with AI coding sessions:
+
+1. **REST API** - HTTP endpoints for managing sessions, messages, permissions, and files
+2. **WebSocket API** - Real-time bidirectional communication via Socket.IO
+3. **Server-Sent Events (SSE)** - One-way server-to-client event streaming
+
+## Base URL
+
+By default, the hub runs on:
+
+```
+http://127.0.0.1:3006
+```
+
+Configure via `HAPI_LISTEN_HOST` and `HAPI_LISTEN_PORT` environment variables.
+
+## Authentication
+
+All API requests require authentication using JWT tokens obtained via the `/api/auth` endpoint.
+
+There are two authentication methods:
+
+### 1. Access Token (CLI and Web)
+
+Use `CLI_API_TOKEN` with an optional namespace suffix:
+
+```bash
+CLI_API_TOKEN:<namespace>
+```
+
+### 2. Telegram Mini App
+
+Use Telegram `initData` validated against the bot token.
+
+### Using JWT Tokens
+
+Once you obtain a JWT token from `/api/auth`, include it in requests:
+
+```bash
+curl -H "Authorization: Bearer <token>" https://hub.example.com/api/sessions
+```
+
+JWT tokens expire after 15 minutes.
+
+## Rate Limits
+
+No rate limits are currently enforced.
+
+## Client Libraries
+
+The official HAPI CLI and web app use TypeScript with:
+
+- **REST**: Native `fetch` API
+- **WebSocket**: Socket.IO client
+- **SSE**: EventSource API
+
+Shared types and schemas are available in the `@hapi/protocol` package.
+
+## Error Responses
+
+All error responses follow this format:
+
+```json
+{
+  "error": "Error message",
+  "code": "error_code"
+}
+```
+
+Common HTTP status codes:
+
+- `400` - Bad Request (invalid input)
+- `401` - Unauthorized (invalid or missing token)
+- `403` - Forbidden (access denied)
+- `404` - Not Found
+- `409` - Conflict (version mismatch, active session)
+- `413` - Payload Too Large
+- `500` - Internal Server Error
+- `503` - Service Unavailable (hub not connected)
+
+## API Sections
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    Get JWT tokens for API access
+  </Card>
+  <Card title="Sessions" icon="terminal" href="/api/sessions">
+    Manage coding sessions
+  </Card>
+  <Card title="Messages" icon="message" href="/api/messages">
+    Send and retrieve messages
+  </Card>
+  <Card title="Permissions" icon="shield" href="/api/permissions">
+    Approve or deny permission requests
+  </Card>
+  <Card title="Machines" icon="server" href="/api/machines">
+    List machines and spawn sessions
+  </Card>
+  <Card title="Git & Files" icon="file-code" href="/api/git-files">
+    Access git status and file contents
+  </Card>
+  <Card title="Voice" icon="microphone" href="/api/voice">
+    Get ElevenLabs conversation tokens
+  </Card>
+  <Card title="Push Notifications" icon="bell" href="/api/push-notifications">
+    Subscribe to web push notifications
+  </Card>
+  <Card title="Socket.IO" icon="plug" href="/api/socket-overview">
+    Real-time WebSocket communication
+  </Card>
+  <Card title="SSE" icon="broadcast-tower" href="/api/sse">
+    Server-sent event streaming
+  </Card>
+</CardGroup>

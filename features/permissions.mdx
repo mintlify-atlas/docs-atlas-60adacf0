@@ -1,0 +1,407 @@
+---
+title: Permissions
+description: Control what your AI agents can do with granular permission modes
+---
+
+HAPI provides granular control over AI agent permissions, allowing you to balance speed and safety based on your needs.
+
+## Overview
+
+Every AI agent in HAPI can operate in different permission modes that control how much autonomy the agent has. From fully manual approval to complete automation, you decide the level of control.
+
+<CardGroup cols={2}>
+  <Card title="Per-Agent Modes" icon="sliders">
+    Each agent type has its own set of permission modes
+  </Card>
+  <Card title="Real-Time Switching" icon="toggle-on">
+    Change modes mid-session without restarting
+  </Card>
+  <Card title="Approval Workflows" icon="clipboard-check">
+    Get notified and approve/deny actions from any device
+  </Card>
+  <Card title="Safe Defaults" icon="shield-check">
+    Default modes require approval for destructive actions
+  </Card>
+</CardGroup>
+
+## Permission Modes by Agent
+
+### Claude Code
+
+Claude Code supports four permission modes:
+
+| Mode | Label | Description | Tone |
+|------|-------|-------------|------|
+| `default` | Default | Standard approval workflow — requests permission for tool usage | Neutral |
+| `acceptEdits` | Accept Edits | Auto-approves file edits but asks for other tools | Warning |
+| `plan` | Plan Mode | Creates execution plans for review before running | Info |
+| `bypassPermissions` | YOLO | Fully autonomous — no permission requests | Danger |
+
+### Codex / Gemini
+
+Codex and Gemini share the same modes:
+
+| Mode | Label | Description | Tone |
+|------|-------|-------------|------|
+| `default` | Default | Standard approval workflow | Neutral |
+| `read-only` | Read Only | Agent can only read files, no modifications | Warning |
+| `safe-yolo` | Safe YOLO | Auto-approves safe operations, asks for risky ones | Warning |
+| `yolo` | YOLO | Fully autonomous — no permission requests | Danger |
+
+### OpenCode
+
+OpenCode has simplified modes:
+
+| Mode | Label | Description | Tone |
+|------|-------|-------------|------|
+| `default` | Default | Standard approval workflow | Neutral |
+| `yolo` | YOLO | Fully autonomous — no permission requests | Danger |
+
+### Cursor Agent
+
+Cursor supports:
+
+| Mode | Label | Description | Tone |
+|------|-------|-------------|------|
+| `default` | Default | Standard approval workflow | Neutral |
+| `plan` | Plan Mode | Creates execution plans first | Info |
+| `ask` | Ask Mode | Prompts before every action | Info |
+| `yolo` | YOLO | Fully autonomous | Danger |
+
+<Tip>
+The mode names come directly from each agent's CLI. HAPI surfaces the same modes you'd use in the terminal.
+</Tip>
+
+## Mode Descriptions
+
+### Default Mode
+
+The balanced approach for most workflows:
+
+- ✅ Agent requests permission for file edits
+- ✅ Agent requests permission for bash commands
+- ✅ Agent requests permission for other tools
+- ⚠️ You approve/deny via web, PWA, or Telegram
+
+**Best for**: Daily development, unfamiliar codebases, learning
+
+### Accept Edits (Claude Code)
+
+Trust the agent with file changes:
+
+- ✅ Auto-approves file edits (Write, Edit)
+- ❌ Still asks for bash commands
+- ❌ Still asks for other tools
+
+**Best for**: Refactoring, when you trust the agent's coding ability
+
+### Plan Mode (Claude Code, Cursor)
+
+Review before execution:
+
+- 📋 Agent creates execution plan
+- ⏸️ Pauses for your review
+- ✅ You approve the whole plan or iterate
+
+**Best for**: Complex tasks, architecture changes, risky operations
+
+### Read-Only (Codex, Gemini)
+
+Explore without risk:
+
+- ✅ Agent can read files
+- ✅ Agent can search codebase
+- ❌ No file modifications
+- ❌ No bash commands
+
+**Best for**: Code review, analysis, exploration
+
+### Safe YOLO (Codex, Gemini)
+
+Automation with guardrails:
+
+- ✅ Auto-approves "safe" operations (reads, writes to existing files)
+- ❌ Asks for risky operations (delete, network, installs)
+
+**Best for**: Trusted codebases, routine tasks
+
+### YOLO Mode (All Agents)
+
+Full autonomy:
+
+- ✅ Auto-approves everything
+- ✅ No interruptions
+- ⚠️ Agent has full control
+
+**Best for**: Trusted agents, sandboxed environments, quick iterations
+
+<Warning>
+YOLO mode grants full control to the AI. Use with caution, especially in production environments.
+</Warning>
+
+## Approval Workflows
+
+### Permission Request Flow
+
+```
+1. AI agent requests tool permission (e.g., file edit)
+         │
+         ▼
+2. CLI sends permission request to hub
+         │
+         ▼
+3. Hub stores request and notifies via SSE + Telegram
+         │
+         ▼
+4. User receives notification on phone
+         │
+         ▼
+5. User approves/denies in web app or Telegram
+         │
+         ▼
+6. Hub relays decision to CLI via Socket.IO
+         │
+         ▼
+7. CLI informs AI agent, execution continues
+```
+
+### Approval Channels
+
+You can approve permissions from:
+
+<CardGroup cols={3}>
+  <Card title="Web App" icon="globe">
+    View details, approve, or deny
+  </Card>
+  <Card title="PWA" icon="mobile-screen">
+    Get push notifications, respond instantly
+  </Card>
+  <Card title="Telegram" icon="paper-plane">
+    Inline buttons in notifications
+  </Card>
+</CardGroup>
+
+### Permission Details
+
+When reviewing a permission request, you see:
+
+- **Tool name** (e.g., "Write", "Bash", "Edit")
+- **Files affected** (for file operations)
+- **Command** (for bash operations)
+- **Context** from the agent's reasoning
+
+## Switching Modes
+
+### From Web Interface
+
+<Steps>
+  <Step title="Open Session">
+    Navigate to the session in web app
+  </Step>
+  <Step title="Permission Mode Selector">
+    Click the permission mode button (shows current mode)
+  </Step>
+  <Step title="Select Mode">
+    Choose new mode from dropdown
+  </Step>
+  <Step title="Instant Switch">
+    Mode changes immediately without restarting session
+  </Step>
+</Steps>
+
+### From API
+
+```bash
+curl -X POST https://your-hub/api/sessions/:id/permission-mode \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "yolo"}'
+```
+
+### Via CLI
+
+Start session with specific mode:
+
+```bash
+# Claude Code with YOLO mode
+hapi --permission-mode yolo
+
+# Codex in read-only mode
+hapi codex --permission-mode read-only
+
+# Cursor in plan mode
+hapi cursor --permission-mode plan
+```
+
+## Use Cases
+
+### Exploratory Phase
+
+Start safe, then speed up:
+
+1. **Begin**: Use `default` mode to understand codebase
+2. **Trust building**: Switch to `acceptEdits` for refactoring
+3. **Rapid iteration**: Switch to `yolo` for quick fixes
+
+### Production Hotfixes
+
+Stay cautious:
+
+1. Always use `default` or `plan` mode
+2. Review every change carefully
+3. Never use `yolo` in production
+
+### Bulk Refactoring
+
+Balance speed and safety:
+
+1. Use `plan` mode for architecture changes
+2. Review the plan
+3. Switch to `acceptEdits` for execution
+4. Monitor progress
+
+### Learning
+
+Understand agent behavior:
+
+1. Use `default` mode
+2. Review every permission request
+3. Learn what the agent wants to do
+4. Adjust mode as you build trust
+
+## Real-Time Notifications
+
+When a permission is requested:
+
+### Push Notifications (PWA)
+
+```
+🔔 Permission Request
+
+Claude Code needs approval
+Edit 3 files in src/
+
+[Tap to review]
+```
+
+### Telegram Notifications
+
+```
+🔔 Permission Request
+
+Session: my-project
+Agent: Claude Code
+
+Requests permission to edit files:
+- src/index.ts
+- src/utils.ts
+
+[Approve] [Deny] [View Session]
+```
+
+### In-App
+
+Session shows:
+- Badge count of pending requests
+- Inline approval UI in chat
+- Highlighted permission requests
+
+## Permission Mode Types
+
+From `shared/src/modes.ts`:
+
+```typescript
+export const CLAUDE_PERMISSION_MODES = [
+  'default', 'acceptEdits', 'bypassPermissions', 'plan'
+] as const
+
+export const CODEX_PERMISSION_MODES = [
+  'default', 'read-only', 'safe-yolo', 'yolo'
+] as const
+
+export const GEMINI_PERMISSION_MODES = [
+  'default', 'read-only', 'safe-yolo', 'yolo'
+] as const
+
+export const OPENCODE_PERMISSION_MODES = [
+  'default', 'yolo'
+] as const
+
+export const CURSOR_PERMISSION_MODES = [
+  'default', 'plan', 'ask', 'yolo'
+] as const
+```
+
+<Note>
+Permission modes are validated at runtime using Zod schemas. Invalid modes are rejected.
+</Note>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Starting a New Project">
+    - Use `default` mode initially
+    - Build trust with the agent over time
+    - Graduate to `acceptEdits` after confidence
+    - Reserve `yolo` for routine tasks
+  </Accordion>
+
+  <Accordion title="Working with Sensitive Code">
+    - Always use `default` or `plan` mode
+    - Review every change
+    - Consider `read-only` for analysis
+    - Never use `yolo` in production
+  </Accordion>
+
+  <Accordion title="Rapid Prototyping">
+    - Start with `yolo` for speed
+    - Review changes in git diffs
+    - Switch to stricter mode for refinement
+    - Commit often
+  </Accordion>
+
+  <Accordion title="Team Environments">
+    - Establish team conventions
+    - Document which modes to use when
+    - Default to safer modes for junior devs
+    - Use `plan` mode for shared codebases
+  </Accordion>
+</AccordionGroup>
+
+## Security Considerations
+
+### Sandboxing
+
+HAPI does not sandbox agent actions:
+
+- Agent runs with your user permissions
+- Has access to all files you can access
+- Can run any command you can run
+- No containerization or virtualization
+
+<Warning>
+Agents have the same permissions as you. Treat `yolo` mode like giving someone your terminal.
+</Warning>
+
+### Recommended Setup
+
+For safer operation:
+
+1. **Separate machine**: Run agents on non-production machine
+2. **Docker container**: Run CLI in container for isolation
+3. **Limited user**: Run CLI as user with restricted permissions
+4. **Git**: Always use version control to review changes
+
+## Related Features
+
+<CardGroup cols={3}>
+  <Card title="Remote Control" href="/features/remote-control" icon="mobile">
+    Approve permissions from anywhere
+  </Card>
+  <Card title="Telegram" href="/features/telegram" icon="paper-plane">
+    Get notified and approve via Telegram
+  </Card>
+  <Card title="PWA" href="/features/pwa" icon="mobile-screen">
+    Push notifications for permission requests
+  </Card>
+</CardGroup>

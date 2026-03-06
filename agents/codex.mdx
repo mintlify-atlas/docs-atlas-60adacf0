@@ -1,0 +1,164 @@
+---
+title: Codex
+description: Run OpenAI-based coding sessions with HAPI
+---
+
+## Overview
+
+Codex mode provides OpenAI-based AI coding sessions with remote control through HAPI. Start sessions from your terminal and control them from web or Telegram.
+
+## Requirements
+
+- HAPI CLI installed (`hapi` command available)
+- Authenticated with HAPI hub (`hapi auth login`)
+- OpenAI API credentials configured
+
+## Starting a Session
+
+### Basic Usage
+
+```bash
+hapi codex              # Start new Codex session
+hapi codex resume <id>  # Resume existing session
+```
+
+### With Options
+
+```bash
+hapi codex --yolo                                  # Bypass approvals
+hapi codex --dangerously-bypass-approvals-and-sandbox  # Full bypass
+hapi codex --model gpt-4                           # Specify model
+```
+
+## Available Flags
+
+| Flag | Description |
+|------|-------------|
+| `resume <sessionId>` | Resume a specific Codex session |
+| `--yolo` | Bypass approval prompts and sandbox restrictions |
+| `--dangerously-bypass-approvals-and-sandbox` | Explicit bypass flag |
+| `--model <model>` | Specify OpenAI model (e.g., gpt-4, gpt-3.5-turbo) |
+| `--started-by` | Internal flag for runner management |
+
+<Warning>
+  The `--yolo` flag bypasses both approval prompts **and** sandbox restrictions. Use with caution.
+</Warning>
+
+## Permission Modes
+
+Codex supports these permission modes:
+
+<CardGroup cols={2}>
+  <Card title="Default" icon="shield-check">
+    Standard behavior with approval prompts
+  </Card>
+  <Card title="Read Only" icon="eye">
+    Only read operations allowed, no file modifications
+  </Card>
+  <Card title="Safe Yolo" icon="shield-halved">
+    Some restrictions bypassed, critical checks remain
+  </Card>
+  <Card title="Yolo" icon="triangle-exclamation">
+    Bypass all approvals and sandbox (use with extreme caution)
+  </Card>
+</CardGroup>
+
+Change permission modes from the web UI during an active session.
+
+See `shared/src/modes.ts:4-5` for mode definitions.
+
+## Resume Functionality
+
+Codex sessions can be resumed by session ID:
+
+```bash
+hapi codex resume abc123
+```
+
+To find session IDs:
+- Check the web UI session list
+- Use `hapi runner list` to see active sessions
+- Session IDs are displayed when starting a session
+
+## Session Modes
+
+### Local Mode
+
+Start from terminal with interactive experience:
+
+```bash
+hapi codex
+```
+
+### Remote Mode
+
+Codex supports remote control through the HAPI hub. Sessions can be started from the web UI or Telegram and will run on your machine.
+
+## Examples
+
+### Start New Session
+
+```bash
+hapi codex
+```
+
+### Resume Existing Session
+
+```bash
+hapi codex resume session_abc123
+```
+
+### Start with Yolo Mode
+
+```bash
+hapi codex --yolo
+```
+
+<Warning>
+  Yolo mode bypasses sandbox restrictions. Only use in trusted environments.
+</Warning>
+
+### Specify Model
+
+```bash
+hapi codex --model gpt-4
+```
+
+## Integration
+
+Once running, your Codex session appears in:
+- HAPI web app
+- Telegram Mini App
+
+You can:
+- Monitor session activity in real-time
+- Approve operations from your phone
+- Send messages to the agent
+- Change permission modes on the fly
+- View file changes and diffs
+
+## MCP Bridge
+
+Codex integrates with MCP (Model Context Protocol) tools:
+
+```bash
+hapi mcp  # Start MCP stdio bridge
+```
+
+This allows Codex to use external tools via the MCP protocol.
+
+## Related Commands
+
+```bash
+hapi auth status        # Check authentication
+hapi runner status      # View background service status
+hapi runner list        # List active sessions
+hapi doctor             # Run diagnostics
+```
+
+## Source Reference
+
+- Command implementation: `cli/src/commands/codex.ts`
+- Session runner: `cli/src/codex/runCodex.ts`
+- Permission modes: `shared/src/modes.ts:4-5`
+- MCP bridge: `cli/src/codex/happyMcpStdioBridge.ts`

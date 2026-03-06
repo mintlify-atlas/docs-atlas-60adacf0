@@ -1,0 +1,407 @@
+---
+title: Telegram Integration
+description: Control HAPI sessions from Telegram with Mini App and notifications
+---
+
+HAPI integrates with Telegram to provide mobile notifications and a full-featured Mini App for session control.
+
+## Overview
+
+<CardGroup cols={2}>
+  <Card title="Mini App" icon="window">
+    Full HAPI interface inside Telegram
+  </Card>
+  <Card title="Notifications" icon="bell">
+    Permission requests and session updates
+  </Card>
+  <Card title="Deep Links" icon="link">
+    Jump directly to specific sessions
+  </Card>
+  <Card title="Inline Actions" icon="hand-pointer">
+    Approve/deny permissions with buttons
+  </Card>
+</CardGroup>
+
+## Setup
+
+### 1. Create a Telegram Bot
+
+<Steps>
+  <Step title="Open BotFather">
+    Message [@BotFather](https://t.me/botfather) on Telegram
+  </Step>
+  <Step title="Create Bot">
+    Send `/newbot` and follow the prompts
+  </Step>
+  <Step title="Get Token">
+    Copy the bot token (format: `123456:ABC-DEF...`)
+  </Step>
+</Steps>
+
+### 2. Configure the Hub
+
+Set these environment variables:
+
+```bash
+export TELEGRAM_BOT_TOKEN="your-bot-token-from-botfather"
+export HAPI_PUBLIC_URL="https://your-domain.example"
+```
+
+<Warning>
+Telegram Mini Apps require HTTPS. You cannot use `http://` or `localhost`. Use a tunnel service like Cloudflare Tunnel if your hub isn't publicly accessible.
+</Warning>
+
+### 3. Start the Hub
+
+```bash
+hapi hub
+```
+
+The bot will start automatically and register commands with Telegram.
+
+### 4. Bind Your Telegram Account
+
+<Steps>
+  <Step title="Open Bot">
+    Find your bot on Telegram and send `/start`
+  </Step>
+  <Step title="Open Mini App">
+    Tap **"Open App"** button
+  </Step>
+  <Step title="Login">
+    Enter your CLI API token: `CLI_API_TOKEN:namespace`
+  </Step>
+  <Step title="Done">
+    Your Telegram account is now bound
+  </Step>
+</Steps>
+
+<Note>
+The namespace suffix (`:namespace`) is optional. Omit it for the default namespace.
+</Note>
+
+## Configuration Options
+
+### Required
+
+| Variable | Description | Example |
+|----------|-------------|----------|
+| `TELEGRAM_BOT_TOKEN` | Token from @BotFather | `123456:ABC-DEF...` |
+| `HAPI_PUBLIC_URL` | Public HTTPS URL | `https://hapi.example.com` |
+
+### Optional
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TELEGRAM_NOTIFICATION` | `true` | Enable/disable notifications |
+| `CLI_API_TOKEN` | Auto-generated | Shared secret for authentication |
+
+## Mini App Features
+
+The Telegram Mini App provides the full HAPI experience:
+
+<CardGroup cols={2}>
+  <Card title="Session List" icon="list">
+    View all active and past sessions
+  </Card>
+  <Card title="Chat Interface" icon="message">
+    Send messages and view responses
+  </Card>
+  <Card title="Permission Control" icon="shield-check">
+    Approve or deny tool access
+  </Card>
+  <Card title="File Browser" icon="folder">
+    Browse files and view git diffs
+  </Card>
+  <Card title="Terminal Access" icon="terminal">
+    Remote terminal via web interface
+  </Card>
+  <Card title="Session Creation" icon="plus">
+    Spawn new sessions on any machine
+  </Card>
+</CardGroup>
+
+### Accessing the Mini App
+
+Open the Mini App in several ways:
+
+1. **Bot Command**: Send `/app` to your bot
+2. **Start Command**: Send `/start` and tap "Open App"
+3. **Deep Link**: Tap notification links
+4. **Telegram Menu**: Use the Mini App menu button
+
+## Notifications
+
+HAPI sends notifications for important events:
+
+### Permission Requests
+
+When an AI agent needs your approval:
+
+```
+🔔 Permission Request
+
+Session: my-project
+Agent: Claude Code
+
+Requests permission to edit files:
+- src/index.ts
+- src/utils.ts
+
+[Approve] [Deny] [View Session]
+```
+
+<Note>
+Tap **Approve** or **Deny** directly in the notification, or **View Session** to see full context in the Mini App.
+</Note>
+
+### Session Ready
+
+When a session completes a task:
+
+```
+✅ Session Ready
+
+Session: my-project
+Agent: Claude Code
+
+Task completed. Ready for your input.
+
+[Open Session]
+```
+
+### Notification Settings
+
+To disable notifications:
+
+```bash
+export TELEGRAM_NOTIFICATION=false
+hapi hub
+```
+
+Or mute notifications in Telegram:
+- Right-click bot → Mute
+
+## Deep Links
+
+HAPI generates deep links that jump directly to specific sessions:
+
+```
+https://t.me/your_bot?start=session_abc123
+```
+
+Deep links are included in:
+- Permission request notifications
+- Session ready notifications
+- Manually generated session links
+
+### How Deep Links Work
+
+1. User taps notification link
+2. Telegram opens your bot
+3. Bot launches Mini App with session ID
+4. Mini App navigates to that session
+
+## Bot Commands
+
+The HAPI bot supports these commands:
+
+| Command | Description |
+|---------|-------------|
+| `/start` | Welcome message with Mini App link |
+| `/app` | Open the Mini App directly |
+
+<Tip>
+All interactive features (viewing sessions, sending messages, etc.) are in the Mini App, not bot commands.
+</Tip>
+
+## Architecture
+
+How Telegram integration works:
+
+```
+┌─────────────┐
+│   Telegram  │
+│   User      │
+└──────┬──────┘
+       │
+       │ (Mini App WebView)
+       ▼
+┌─────────────┐         ┌─────────────┐
+│  Mini App   │◄───────►│  HAPI Hub   │
+│  (React)    │   API   │  (Server)   │
+└─────────────┘         └──────┬──────┘
+                               │
+                               ▼
+                        ┌─────────────┐
+                        │ Telegram    │
+                        │ Bot API     │
+                        └─────────────┘
+                               │
+                               ▼
+                        (Notifications)
+```
+
+### Authentication Flow
+
+1. User opens Mini App in Telegram
+2. Mini App sends Telegram initData to hub
+3. Hub verifies initData with Telegram
+4. Hub checks if Telegram ID is bound to namespace
+5. Hub issues JWT token
+6. Mini App uses JWT for API requests
+
+## Use Cases
+
+### Mobile-First Workflow
+
+Use Telegram as your primary mobile interface:
+
+1. Start session on desktop: `hapi`
+2. Get notification on Telegram when permission needed
+3. Approve directly in notification
+4. Get notified when task completes
+5. Open Mini App to send next instruction
+
+### Notification-Only Mode
+
+Use Telegram just for notifications:
+
+1. Enable Telegram integration
+2. Use PWA for main interface
+3. Get critical alerts via Telegram
+4. Act on notifications when convenient
+
+### Multi-User Teams
+
+Each team member can bind their Telegram:
+
+1. Each user gets their own namespace
+2. Each user binds Telegram with `CLI_API_TOKEN:username`
+3. Notifications go to the right person
+4. No shared Telegram account needed
+
+## Advantages Over PWA
+
+<CardGroup cols={2}>
+  <Card title="Better iOS Support" icon="apple">
+    No Safari limitations, full push notifications
+  </Card>
+  <Card title="No Installation" icon="download">
+    Works immediately, no install step
+  </Card>
+  <Card title="Telegram Ecosystem" icon="paper-plane">
+    Integrates with existing Telegram workflow
+  </Card>
+  <Card title="Reliable Notifications" icon="bell">
+    Uses Telegram's robust notification system
+  </Card>
+</CardGroup>
+
+## Security Considerations
+
+### Bot Token
+
+Keep your bot token secure:
+- Never commit to git
+- Use environment variables
+- Rotate if compromised
+
+### Binding
+
+Telegram binding is secure:
+- Uses Telegram's initData verification
+- Cryptographically signed by Telegram
+- Can't be spoofed
+
+### Public URL
+
+Your `HAPI_PUBLIC_URL` should:
+- Use HTTPS (required by Telegram)
+- Be accessible only to authorized users
+- Use authentication (CLI_API_TOKEN)
+
+<Warning>
+Don't expose your hub publicly without authentication. Always require CLI_API_TOKEN for access.
+</Warning>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Bot Not Responding">
+    - Verify `TELEGRAM_BOT_TOKEN` is correct
+    - Check hub logs for errors
+    - Ensure hub is running
+    - Test token with Telegram's API
+  </Accordion>
+
+  <Accordion title="Mini App Won't Open">
+    - Verify `HAPI_PUBLIC_URL` uses HTTPS (not HTTP)
+    - Check CORS settings include Telegram domains
+    - Ensure hub is accessible from public internet
+    - Test URL in browser first
+  </Accordion>
+
+  <Accordion title="Notifications Not Arriving">
+    - Check `TELEGRAM_NOTIFICATION=true`
+    - Verify Telegram account is bound
+    - Ensure bot isn't muted in Telegram
+    - Check hub logs for send errors
+  </Accordion>
+
+  <Accordion title="Can't Bind Account">
+    - Verify `CLI_API_TOKEN` is correct
+    - Check namespace if using multi-user setup
+    - Ensure hub is running and accessible
+    - Try logging in via web first
+  </Accordion>
+
+  <Accordion title="Deep Links Not Working">
+    - Verify `HAPI_PUBLIC_URL` is set correctly
+    - Check bot username matches URL
+    - Ensure session ID exists
+    - Try `/app` command as fallback
+  </Accordion>
+</AccordionGroup>
+
+## Tunneling for Development
+
+Telegram requires HTTPS. For local development:
+
+### Cloudflare Tunnel (Recommended)
+
+```bash
+cloudflared tunnel --url http://localhost:3006
+```
+
+Use the generated `https://` URL as `HAPI_PUBLIC_URL`.
+
+### ngrok
+
+```bash
+ngrok http 3006
+```
+
+Use the forwarding URL as `HAPI_PUBLIC_URL`.
+
+### Tailscale
+
+Enable HTTPS on your Tailscale network and use your machine's Tailscale URL.
+
+<Tip>
+For production deployments, use a proper domain with SSL certificate instead of tunnels.
+</Tip>
+
+## Related Features
+
+<CardGroup cols={3}>
+  <Card title="PWA" href="/features/pwa" icon="mobile-screen">
+    Alternative mobile experience
+  </Card>
+  <Card title="Remote Control" href="/features/remote-control" icon="mobile">
+    Switch between local and remote
+  </Card>
+  <Card title="Permissions" href="/features/permissions" icon="shield-check">
+    Control agent access to tools
+  </Card>
+</CardGroup>

@@ -1,0 +1,623 @@
+---
+title: 'Environment Variables'
+description: 'Configure HAPI CLI behavior with environment variables'
+---
+
+## Overview
+
+HAPI CLI can be configured using environment variables. These variables control connection settings, storage locations, feature flags, and runtime behavior.
+
+## Required Variables
+
+### CLI_API_TOKEN
+
+Shared secret for authenticating with the HAPI hub. **Required** for CLI-hub communication.
+
+<ParamField path="CLI_API_TOKEN" type="string" required>
+  Authentication token matching the hub's token.
+  
+  **Priority:**
+  1. Environment variable (highest)
+  2. `~/.hapi/settings.json` file
+  3. Interactive prompt (first run)
+  
+  ```bash
+  export CLI_API_TOKEN=hapi_abc123xyz789...
+  ```
+</ParamField>
+
+**How to get the token:**
+- Check hub startup logs (generated on first run)
+- Read `~/.hapi/settings.json` on the hub server
+- Ask your hub administrator
+- Use `hapi auth login` to save it locally
+
+**Example:**
+```bash
+export CLI_API_TOKEN=hapi_abc123xyz789def456ghi789jkl012
+hapi
+```
+
+---
+
+## Connection Settings
+
+### HAPI_API_URL
+
+Base URL of the HAPI hub server.
+
+<ParamField path="HAPI_API_URL" type="string" default="http://localhost:3006">
+  Hub server URL for API and Socket.IO connections.
+  
+  ```bash
+  export HAPI_API_URL=https://your-hub.com
+  ```
+</ParamField>
+
+**Examples:**
+
+```bash
+# Local hub
+export HAPI_API_URL=http://localhost:3006
+
+# Remote hub
+export HAPI_API_URL=https://hapi.example.com
+
+# Custom port
+export HAPI_API_URL=http://192.168.1.100:8080
+```
+
+**Verify connection:**
+```bash
+hapi auth status
+```
+
+---
+
+## Storage and Paths
+
+### HAPI_HOME
+
+Custom directory for HAPI data, settings, and logs.
+
+<ParamField path="HAPI_HOME" type="string" default="~/.hapi">
+  Configuration and data directory. Supports `~` expansion.
+  
+  ```bash
+  export HAPI_HOME=~/custom/hapi/data
+  ```
+</ParamField>
+
+**What's stored in HAPI_HOME:**
+
+```
+$HAPI_HOME/
+├── settings.json           # User settings and token
+├── access.key              # Encryption keys (if used)
+├── runner.state.json       # Runner state
+├── runner.state.json.lock  # Runner lock file
+└── logs/
+    ├── runner-*.log        # Runner logs
+    └── session-*.log       # Session logs
+```
+
+**Use cases:**
+
+**Multiple namespaces:**
+```bash
+# Namespace 1
+export HAPI_HOME=~/.hapi-prod
+export CLI_API_TOKEN=prod-token
+hapi
+
+# Namespace 2
+export HAPI_HOME=~/.hapi-dev
+export CLI_API_TOKEN=dev-token
+hapi
+```
+
+**Custom location:**
+```bash
+export HAPI_HOME=/mnt/data/hapi
+hapi
+```
+
+---
+
+## Feature Flags
+
+### HAPI_EXPERIMENTAL
+
+Enable experimental features (currently unused, reserved for future features).
+
+<ParamField path="HAPI_EXPERIMENTAL" type="boolean" default="false">
+  Enable experimental features.
+  
+  **Accepted values:** `true`, `1`, `yes` (case-insensitive)
+  
+  ```bash
+  export HAPI_EXPERIMENTAL=true
+  ```
+</ParamField>
+
+**Examples:**
+```bash
+# Enable
+export HAPI_EXPERIMENTAL=true
+# or
+export HAPI_EXPERIMENTAL=1
+# or
+export HAPI_EXPERIMENTAL=yes
+
+# Disable (default)
+unset HAPI_EXPERIMENTAL
+# or
+export HAPI_EXPERIMENTAL=false
+```
+
+---
+
+## Agent Configuration
+
+### HAPI_CLAUDE_PATH
+
+Custom path to the Claude CLI executable.
+
+<ParamField path="HAPI_CLAUDE_PATH" type="string" default="claude (from PATH)">
+  Absolute path to a specific `claude` binary.
+  
+  ```bash
+  export HAPI_CLAUDE_PATH=/usr/local/bin/claude-beta
+  ```
+</ParamField>
+
+**Use cases:**
+
+**Multiple Claude versions:**
+```bash
+export HAPI_CLAUDE_PATH=/opt/claude-beta/bin/claude
+hapi
+```
+
+**Development builds:**
+```bash
+export HAPI_CLAUDE_PATH=~/dev/claude/target/debug/claude
+hapi
+```
+
+---
+
+### HAPI_HTTP_MCP_URL
+
+Default MCP (Model Context Protocol) target URL for `hapi mcp`.
+
+<ParamField path="HAPI_HTTP_MCP_URL" type="string" optional>
+  HTTP URL for MCP stdio bridge target.
+  
+  ```bash
+  export HAPI_HTTP_MCP_URL=http://localhost:8080/mcp
+  ```
+</ParamField>
+
+**Example:**
+```bash
+export HAPI_HTTP_MCP_URL=http://localhost:8080/mcp
+hapi mcp
+```
+
+---
+
+## Runner Configuration
+
+### HAPI_RUNNER_HEARTBEAT_INTERVAL
+
+Interval (in milliseconds) between runner heartbeats.
+
+<ParamField path="HAPI_RUNNER_HEARTBEAT_INTERVAL" type="number" default="60000">
+  Heartbeat interval in milliseconds (60000 = 60 seconds).
+  
+  ```bash
+  export HAPI_RUNNER_HEARTBEAT_INTERVAL=30000  # 30 seconds
+  ```
+</ParamField>
+
+**Recommended values:**
+- **Default:** `60000` (1 minute) - good balance
+- **Frequent:** `30000` (30 seconds) - faster failure detection
+- **Infrequent:** `120000` (2 minutes) - lower overhead
+
+**Example:**
+```bash
+export HAPI_RUNNER_HEARTBEAT_INTERVAL=30000
+hapi runner start
+```
+
+---
+
+### HAPI_RUNNER_HTTP_TIMEOUT
+
+HTTP timeout (in milliseconds) for runner control requests.
+
+<ParamField path="HAPI_RUNNER_HTTP_TIMEOUT" type="number" default="10000">
+  Timeout for HTTP requests to runner control API (10000 = 10 seconds).
+  
+  ```bash
+  export HAPI_RUNNER_HTTP_TIMEOUT=15000  # 15 seconds
+  ```
+</ParamField>
+
+**Use cases:**
+
+**Slow networks:**
+```bash
+export HAPI_RUNNER_HTTP_TIMEOUT=20000  # 20 seconds
+```
+
+**Fast local networks:**
+```bash
+export HAPI_RUNNER_HTTP_TIMEOUT=5000  # 5 seconds
+```
+
+---
+
+## Worktree Variables
+
+<Note>
+  These variables are **set automatically by the runner** when spawning sessions in worktrees. Do not set them manually.
+</Note>
+
+When the runner spawns a session in a Git worktree, it sets these variables for the session process:
+
+### HAPI_WORKTREE_BASE_PATH
+
+<ParamField path="HAPI_WORKTREE_BASE_PATH" type="string" readonly>
+  Absolute path to the base repository.
+  
+  **Example:** `/home/user/projects/myproject`
+</ParamField>
+
+---
+
+### HAPI_WORKTREE_BRANCH
+
+<ParamField path="HAPI_WORKTREE_BRANCH" type="string" readonly>
+  Git branch name for the worktree.
+  
+  **Example:** `feature/new-ui`
+</ParamField>
+
+---
+
+### HAPI_WORKTREE_NAME
+
+<ParamField path="HAPI_WORKTREE_NAME" type="string" readonly>
+  Worktree name (typically same as branch).
+  
+  **Example:** `feature-new-ui`
+</ParamField>
+
+---
+
+### HAPI_WORKTREE_PATH
+
+<ParamField path="HAPI_WORKTREE_PATH" type="string" readonly>
+  Absolute path to the worktree directory.
+  
+  **Example:** `/home/user/projects/myproject/.worktrees/feature-new-ui`
+</ParamField>
+
+---
+
+### HAPI_WORKTREE_CREATED_AT
+
+<ParamField path="HAPI_WORKTREE_CREATED_AT" type="number" readonly>
+  Unix timestamp (milliseconds) when worktree was created.
+  
+  **Example:** `1709712000000`
+</ParamField>
+
+---
+
+## Hub Server Variables
+
+These variables configure the hub server when running `hapi hub`:
+
+### WEBAPP_HOST
+
+<ParamField path="WEBAPP_HOST" type="string" default="127.0.0.1">
+  Host interface for hub to bind to.
+  
+  ```bash
+  export WEBAPP_HOST=0.0.0.0  # All interfaces
+  hapi hub
+  ```
+</ParamField>
+
+**Options:**
+- `127.0.0.1` - Localhost only (default, most secure)
+- `0.0.0.0` - All interfaces (network access)
+- `192.168.1.100` - Specific interface
+
+**Example:**
+```bash
+export WEBAPP_HOST=0.0.0.0
+hapi hub
+```
+
+---
+
+### WEBAPP_PORT
+
+<ParamField path="WEBAPP_PORT" type="string" default="3006">
+  HTTP port for hub server.
+  
+  ```bash
+  export WEBAPP_PORT=8080
+  hapi hub
+  ```
+</ParamField>
+
+**Example:**
+```bash
+export WEBAPP_PORT=8080
+hapi hub
+```
+
+---
+
+## Debug Variables
+
+### DEBUG
+
+Enable verbose debug logging.
+
+<ParamField path="DEBUG" type="string" optional>
+  Enable debug mode for detailed logging and error traces.
+  
+  ```bash
+  export DEBUG=1
+  hapi doctor
+  ```
+</ParamField>
+
+**Examples:**
+```bash
+# Enable debug mode
+export DEBUG=1
+hapi
+
+# Run single command with debug
+DEBUG=1 hapi doctor
+```
+
+---
+
+## Complete Configuration Example
+
+A typical production setup:
+
+```bash
+# ~/.bashrc or ~/.zshrc
+
+# Required: Authentication
+export CLI_API_TOKEN=hapi_abc123xyz789def456ghi789jkl012
+
+# Required: Hub URL
+export HAPI_API_URL=https://hapi.example.com
+
+# Optional: Custom data directory
+export HAPI_HOME=~/.hapi
+
+# Optional: Runner tuning
+export HAPI_RUNNER_HEARTBEAT_INTERVAL=30000
+export HAPI_RUNNER_HTTP_TIMEOUT=15000
+
+# Optional: Custom Claude path
+export HAPI_CLAUDE_PATH=/usr/local/bin/claude
+
+# Optional: Experimental features
+export HAPI_EXPERIMENTAL=false
+```
+
+---
+
+## Environment File
+
+For development, create an `.env` file:
+
+```bash
+# .env
+CLI_API_TOKEN=hapi_dev_token_123
+HAPI_API_URL=http://localhost:3006
+HAPI_HOME=~/.hapi-dev
+HAPI_EXPERIMENTAL=true
+DEBUG=1
+```
+
+**Load with:**
+```bash
+# Using dotenv
+set -a
+source .env
+set +a
+hapi
+
+# Or export manually
+export $(cat .env | xargs)
+hapi
+```
+
+---
+
+## Per-Command Variables
+
+Set variables for a single command:
+
+```bash
+# Use different hub for one session
+HAPI_API_URL=https://other-hub.com hapi
+
+# Use custom home for one session
+HAPI_HOME=~/.hapi-test hapi codex
+
+# Debug a single command
+DEBUG=1 hapi doctor
+```
+
+---
+
+## Verification
+
+Check current configuration:
+
+```bash
+# View all HAPI variables
+env | grep HAPI
+
+# View specific variables
+echo $CLI_API_TOKEN
+echo $HAPI_API_URL
+echo $HAPI_HOME
+
+# Check auth status
+hapi auth status
+```
+
+---
+
+## Security Best Practices
+
+<Warning>
+  Never commit environment files with secrets to version control.
+</Warning>
+
+### 1. Use `.env` files with `.gitignore`
+
+```bash
+# .gitignore
+.env
+.env.*
+!.env.example
+```
+
+### 2. Create example files
+
+```bash
+# .env.example
+CLI_API_TOKEN=your-token-here
+HAPI_API_URL=http://localhost:3006
+HAPI_HOME=~/.hapi
+```
+
+### 3. Use secrets managers in CI/CD
+
+**GitHub Actions:**
+```yaml
+env:
+  CLI_API_TOKEN: ${{ secrets.HAPI_CLI_TOKEN }}
+  HAPI_API_URL: ${{ secrets.HAPI_API_URL }}
+```
+
+**GitLab CI:**
+```yaml
+variables:
+  CLI_API_TOKEN: $HAPI_CLI_TOKEN  # Set in CI/CD settings
+  HAPI_API_URL: $HAPI_API_URL
+```
+
+### 4. Rotate tokens regularly
+
+```bash
+# Generate new token
+openssl rand -hex 32
+
+# Update hub and all clients
+export CLI_API_TOKEN=new-token
+hapi auth login
+```
+
+---
+
+## Troubleshooting
+
+### Variable Not Taking Effect
+
+**Check if set:**
+```bash
+env | grep HAPI
+```
+
+**Re-export:**
+```bash
+export HAPI_API_URL=https://new-hub.com
+hapi auth status
+```
+
+**Check shell config:**
+```bash
+# Bash
+source ~/.bashrc
+
+# Zsh
+source ~/.zshrc
+```
+
+---
+
+### Token Issues
+
+**Token not recognized:**
+```bash
+# Verify token is set
+echo "$CLI_API_TOKEN"
+
+# Check priority
+hapi auth status
+
+# Re-login
+hapi auth logout
+hapi auth login
+```
+
+---
+
+### Custom Home Not Working
+
+**Check path expansion:**
+```bash
+# This works
+export HAPI_HOME=~/.hapi-custom
+
+# This also works
+export HAPI_HOME=/home/user/.hapi-custom
+
+# Verify
+echo $HAPI_HOME
+ls -la $HAPI_HOME
+```
+
+---
+
+## Reference Table
+
+| Variable | Type | Default | Required | Description |
+|----------|------|---------|----------|-------------|
+| `CLI_API_TOKEN` | string | - | Yes | Authentication token for hub |
+| `HAPI_API_URL` | string | `http://localhost:3006` | No | Hub server URL |
+| `HAPI_HOME` | string | `~/.hapi` | No | Data directory |
+| `HAPI_EXPERIMENTAL` | boolean | `false` | No | Enable experimental features |
+| `HAPI_CLAUDE_PATH` | string | `claude` | No | Custom Claude CLI path |
+| `HAPI_HTTP_MCP_URL` | string | - | No | MCP bridge target URL |
+| `HAPI_RUNNER_HEARTBEAT_INTERVAL` | number | `60000` | No | Heartbeat interval (ms) |
+| `HAPI_RUNNER_HTTP_TIMEOUT` | number | `10000` | No | HTTP timeout (ms) |
+| `WEBAPP_HOST` | string | `127.0.0.1` | No | Hub host interface |
+| `WEBAPP_PORT` | string | `3006` | No | Hub HTTP port |
+| `DEBUG` | string | - | No | Enable debug logging |
+
+---
+
+## Next Steps
+
+- [Settings File](/cli/settings-file) - Understand the settings.json structure
+- [Authentication](/cli/auth-commands) - Configure CLI_API_TOKEN
+- [Hub Command](/cli/hub-command) - Start the hub server

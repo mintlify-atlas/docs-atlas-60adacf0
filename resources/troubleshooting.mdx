@@ -1,0 +1,385 @@
+---
+title: Troubleshooting
+description: Common issues and solutions for HAPI
+---
+
+## Connection Issues
+
+### "Connection refused" error
+
+If you're seeing a connection refused error when the CLI tries to connect to the hub:
+
+**Check if the hub is running:**
+```bash
+hapi hub
+```
+
+**Verify the firewall allows port 3006:**
+```bash
+# On Linux with ufw
+sudo ufw allow 3006
+
+# On macOS
+# Check System Settings → Network → Firewall
+```
+
+**Verify HAPI_API_URL is correct:**
+```bash
+echo $HAPI_API_URL
+# Should match your hub URL, default: http://localhost:3006
+```
+
+<Note>If the hub is running on a different machine, make sure `HAPI_API_URL` points to the correct host and port.</Note>
+
+### "Invalid token" error
+
+Authentication failed when connecting to the hub:
+
+**Re-run authentication:**
+```bash
+hapi auth login
+```
+
+**Check token matches in CLI and hub:**
+```bash
+# View your saved token
+cat ~/.hapi/settings.json | grep cliApiToken
+
+# Or use the auth status command
+hapi auth status
+```
+
+**Verify `~/.hapi/settings.json` has correct `cliApiToken`:**
+
+If the file is missing or corrupted, the hub will regenerate it on next start.
+
+<Warning>Never share your `CLI_API_TOKEN` - it provides full access to your HAPI instance.</Warning>
+
+### Relay connectivity issues
+
+If you're using `hapi hub --relay` and experiencing connectivity problems:
+
+**Force TCP mode:**
+```bash
+export HAPI_RELAY_FORCE_TCP=true
+hapi hub --relay
+```
+
+<Tip>The relay uses UDP by default. Some networks block UDP traffic, so forcing TCP can resolve connectivity issues.</Tip>
+
+### Self-signed certificate errors
+
+If you see "self signed certificate" errors when using HTTPS:
+
+**Best solution: Use a publicly trusted certificate**
+```bash
+# Use Let's Encrypt or similar
+```
+
+**For development: Trust your private CA**
+```bash
+export NODE_EXTRA_CA_CERTS="/path/to/your-ca.pem"
+```
+
+**Development workaround only (insecure):**
+```bash
+export NODE_TLS_REJECT_UNAUTHORIZED=0
+```
+
+<Warning>Never use `NODE_TLS_REJECT_UNAUTHORIZED=0` in production - it disables certificate verification and exposes you to man-in-the-middle attacks.</Warning>
+
+## Session Issues
+
+### Runner won't start
+
+If the runner daemon fails to start:
+
+**Check runner status:**
+```bash
+hapi runner status
+```
+
+**Clear stale lock file:**
+```bash
+rm ~/.hapi/runner.state.json.lock
+```
+
+**Check runner logs:**
+```bash
+hapi runner logs
+# Then view the log file path shown
+```
+
+**Restart the runner:**
+```bash
+hapi runner stop
+hapi runner start
+```
+
+### Sessions not appearing in web app
+
+**Verify the hub is running:**
+```bash
+# Check if hub process is active
+ps aux | grep "hapi hub"
+```
+
+**Check the CLI is connected:**
+```bash
+# Look for connection confirmation when starting a session
+hapi
+```
+
+**Verify SSE connection:**
+
+Open your browser's developer tools and check the Network tab for an active connection to `/api/events`.
+
+<Note>Server-Sent Events (SSE) provide real-time updates to the web app. If SSE fails, sessions won't update in real-time.</Note>
+
+## Agent Issues
+
+### Claude Code not found
+
+HAPI can't locate the Claude Code CLI:
+
+**Install Claude Code:**
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+**Or set custom path:**
+```bash
+export HAPI_CLAUDE_PATH=/path/to/claude
+hapi
+```
+
+**Verify installation:**
+```bash
+claude --version
+```
+
+### Cursor Agent not found
+
+HAPI can't locate the Cursor Agent CLI:
+
+**Install Cursor Agent CLI:**
+```bash
+# macOS/Linux
+curl https://cursor.com/install -fsS | bash
+
+# Windows (PowerShell)
+irm 'https://cursor.com/install?win32=true' | iex
+```
+
+**Ensure `agent` is on your PATH:**
+```bash
+which agent
+# Should return the path to the agent binary
+```
+
+**Verify installation:**
+```bash
+agent --version
+```
+
+### Other agents not found
+
+**For Codex:**
+```bash
+codex --version
+```
+
+**For Gemini:**
+```bash
+gemini --version
+```
+
+**For OpenCode:**
+```bash
+opencode --version
+```
+
+<Tip>Make sure the agent CLI is installed and available in your PATH before running HAPI.</Tip>
+
+## Hub Startup Issues
+
+### Port already in use
+
+If port 3006 is already taken:
+
+**Check what's using the port:**
+```bash
+# Linux/macOS
+lsof -i :3006
+
+# Windows
+netstat -ano | findstr :3006
+```
+
+**Use a different port:**
+```bash
+export HAPI_LISTEN_PORT=3007
+hapi hub
+```
+
+**Or kill the process:**
+```bash
+# Find and kill the process using port 3006
+kill <PID>
+```
+
+### Database issues
+
+If the database becomes corrupted:
+
+**Backup and reset:**
+```bash
+# Backup existing data
+cp ~/.hapi/hapi.db ~/.hapi/hapi.db.backup
+
+# Remove corrupted database
+rm ~/.hapi/hapi.db
+
+# Restart hub (will create new database)
+hapi hub
+```
+
+<Warning>Removing the database will delete all session history and settings. Always backup first.</Warning>
+
+## Telegram Issues
+
+### Bot not responding
+
+**Verify bot token is correct:**
+```bash
+echo $TELEGRAM_BOT_TOKEN
+```
+
+**Check public URL is set:**
+```bash
+echo $HAPI_PUBLIC_URL
+# Must be accessible from the internet
+```
+
+**Verify public URL is accessible:**
+```bash
+curl $HAPI_PUBLIC_URL/api/health
+# Should return {"status":"ok"}
+```
+
+<Note>Telegram Mini Apps require HTTPS - they won't work with plain HTTP URLs.</Note>
+
+### Can't bind Telegram account
+
+**Ensure you're using the correct token:**
+
+The token you enter in the Telegram Mini App must match your `CLI_API_TOKEN`.
+
+**Check hub logs:**
+```bash
+# Look for Telegram-related errors in hub output
+```
+
+## Diagnostics
+
+### Run full diagnostics
+
+HAPI includes a built-in diagnostics tool:
+
+```bash
+hapi doctor
+```
+
+This checks:
+- Hub connectivity
+- Token validity
+- Agent availability
+- Runner status
+- Recent logs
+- Active processes
+
+### Clean up runaway processes
+
+If you have stuck HAPI processes:
+
+```bash
+hapi doctor clean
+```
+
+<Warning>This will terminate all HAPI processes. Active sessions will be interrupted.</Warning>
+
+## Notification Issues
+
+### PWA push notifications not working
+
+**Enable notifications in browser:**
+
+Check your browser settings and allow notifications for the HAPI web app.
+
+**Re-subscribe to push:**
+
+In the web app, go to Settings and toggle notifications off, then on again.
+
+**Check VAPID configuration:**
+```bash
+echo $VAPID_SUBJECT
+# Should be set if using custom VAPID keys
+```
+
+### Telegram notifications not arriving
+
+**Verify Telegram notifications are enabled:**
+```bash
+echo $TELEGRAM_NOTIFICATION
+# Should be 'true' or unset (defaults to true)
+```
+
+**Check bot token and webhook:**
+
+Ensure your bot token is valid and the webhook is properly registered.
+
+## Performance Issues
+
+### Slow terminal response
+
+**Check network latency:**
+```bash
+ping <your-hub-host>
+```
+
+**Consider using a tunnel with lower latency:**
+- Tailscale for peer-to-peer connections
+- Self-hosted on local network
+- Cloudflare Tunnel with nearby data center
+
+### High CPU usage
+
+**Check runner sessions:**
+```bash
+hapi runner list
+```
+
+**Monitor hub process:**
+```bash
+top -p $(pgrep -f "hapi hub")
+```
+
+## Still Having Issues?
+
+If you've tried the above solutions and still experiencing problems:
+
+<CardGroup cols={2}>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/tiann/hapi/issues">
+    Report bugs and get help from the community
+  </Card>
+  <Card title="Telegram Group" icon="telegram" href="https://t.me/veryhapi">
+    Join the discussion and ask questions
+  </Card>
+</CardGroup>
+
+When reporting issues, include:
+- Output from `hapi doctor`
+- Relevant error messages
+- HAPI version (`hapi --version`)
+- Operating system and version
+- Steps to reproduce the issue

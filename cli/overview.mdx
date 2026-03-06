@@ -1,0 +1,143 @@
+---
+title: 'CLI Overview'
+description: 'Run Claude Code, Codex, Cursor Agent, Gemini, or OpenCode sessions from your terminal'
+---
+
+## What is the HAPI CLI?
+
+The HAPI CLI is a command-line tool that wraps AI coding agents and connects them to the HAPI hub for remote control. It allows you to:
+
+- Start Claude Code sessions with remote control capabilities
+- Run Codex mode for OpenAI-based sessions
+- Use Cursor Agent for Cursor CLI sessions
+- Start Gemini sessions via ACP (Anthropic Code Plugins)
+- Run OpenCode sessions via ACP and plugin hooks
+- Manage background runners for long-running sessions
+- Control sessions remotely through web or mobile apps
+
+## Installation
+
+Install HAPI CLI via npm:
+
+```bash
+npm install -g @twsxtd/hapi
+```
+
+### Requirements
+
+Depending on which agent you want to use, you'll need:
+
+- **Claude Code**: Claude CLI installed and logged in (`claude` on PATH)
+- **Cursor Agent**: Cursor Agent CLI (`agent` on PATH)
+  - macOS/Linux: `curl https://cursor.com/install -fsS | bash`
+  - Windows: `irm 'https://cursor.com/install?win32=true' | iex`
+- **OpenCode**: OpenCode CLI installed (`opencode` on PATH)
+
+## Basic Usage
+
+### Quick Start
+
+1. Start a session:
+
+```bash
+hapi
+```
+
+2. If this is your first run, you'll be prompted for your `CLI_API_TOKEN`. You can also set it via environment variable:
+
+```bash
+export CLI_API_TOKEN=your-token-here
+hapi
+```
+
+3. Use the web app or Telegram Mini App to monitor and control your session.
+
+### Command Structure
+
+All HAPI commands follow this structure:
+
+```bash
+hapi [command] [subcommand] [options]
+```
+
+## Available Commands
+
+<CardGroup cols={2}>
+  <Card title="Session Commands" icon="terminal" href="/cli/session-commands">
+    Start and manage AI agent sessions (Claude, Codex, Cursor, Gemini, OpenCode)
+  </Card>
+  <Card title="Authentication" icon="key" href="/cli/auth-commands">
+    Manage CLI authentication and tokens
+  </Card>
+  <Card title="Runner Management" icon="server" href="/cli/runner-commands">
+    Control the background service that manages sessions
+  </Card>
+  <Card title="Hub Server" icon="globe" href="/cli/hub-command">
+    Start the bundled HAPI hub server
+  </Card>
+  <Card title="Diagnostics" icon="stethoscope" href="/cli/diagnostics">
+    System diagnostics and troubleshooting
+  </Card>
+  <Card title="Configuration" icon="gear" href="/cli/environment-variables">
+    Environment variables and settings
+  </Card>
+</CardGroup>
+
+## Common Examples
+
+### Start a Claude session
+
+```bash
+hapi
+```
+
+### Start with bypass permissions (YOLO mode)
+
+```bash
+hapi --yolo
+```
+
+### Resume a previous session
+
+```bash
+hapi --resume
+```
+
+### Start Codex mode
+
+```bash
+hapi codex
+```
+
+### Start Cursor Agent
+
+```bash
+hapi cursor
+```
+
+### Check authentication status
+
+```bash
+hapi auth status
+```
+
+### Run diagnostics
+
+```bash
+hapi doctor
+```
+
+## How It Works
+
+1. **CLI wraps agent**: The HAPI CLI spawns your chosen AI agent (Claude, Codex, Cursor, etc.)
+2. **Connects to hub**: Establishes a Socket.IO connection to the HAPI hub
+3. **Registers session**: Creates a session record and streams agent events to the hub
+4. **Remote control**: Web/mobile apps can send commands and receive updates in real-time
+5. **Background runner**: Optionally runs as a daemon to keep sessions alive
+
+## Next Steps
+
+- [Session Commands](/cli/session-commands) - Learn about all available session types
+- [Authentication](/cli/auth-commands) - Set up your CLI token
+- [Environment Variables](/cli/environment-variables) - Configure HAPI CLI
+- [Settings File](/cli/settings-file) - Customize local settings

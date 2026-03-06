@@ -1,0 +1,726 @@
+---
+title: Socket.IO Events
+description: Detailed event reference for client and server events
+---
+
+## Client to Server Events
+
+Events sent from CLI to hub.
+
+---
+
+### message
+
+Send a message to a session.
+
+**Payload:**
+
+<ParamField name="sid" type="string" required>
+  Session ID
+</ParamField>
+
+<ParamField name="message" type="any" required>
+  Message content (string or object)
+</ParamField>
+
+<ParamField name="localId" type="string" optional>
+  Client-generated ID for deduplication
+</ParamField>
+
+**Example:**
+
+```typescript
+socket.emit('message', {
+  sid: 'abc123',
+  message: {
+    type: 'text',
+    text: 'Hello from CLI'
+  },
+  localId: 'local-456'
+})
+```
+
+**Behavior:**
+
+- Validates namespace access
+- Stores message in database
+- Assigns sequence number
+- Broadcasts to session room via `update` event
+- Publishes to SSE subscribers
+- Extracts todos from TodoWrite tool calls
+
+---
+
+### session-alive
+
+Keep session active and update state.
+
+**Payload:**
+
+<ParamField name="sid" type="string" required>
+  Session ID
+</ParamField>
+
+<ParamField name="time" type="number" required>
+  Unix timestamp (ms)
+</ParamField>
+
+<ParamField name="thinking" type="boolean" optional>
+  Whether agent is thinking
+</ParamField>
+
+<ParamField name="mode" type="string" optional>
+  Session mode: `local` or `remote`
+</ParamField>
+
+<ParamField name="permissionMode" type="string" optional>
+  Current permission mode
+</ParamField>
+
+<ParamField name="modelMode" type="string" optional>
+  Current model mode (Claude only)
+</ParamField>
+
+**Example:**
+
+```typescript
+socket.emit('session-alive', {
+  sid: 'abc123',
+  time: Date.now(),
+  thinking: false,
+  mode: 'remote',
+  permissionMode: 'default'
+})
+```
+
+**Behavior:**
+
+- Updates session's `activeAt` timestamp
+- Updates `thinking` state
+- Prevents session timeout
+- Send every 5 seconds
+
+---
+
+### session-end
+
+Mark session as ended.
+
+**Payload:**
+
+<ParamField name="sid" type="string" required>
+  Session ID
+</ParamField>
+
+<ParamField name="time" type="number" required>
+  Unix timestamp (ms)
+</ParamField>
+
+**Example:**
+
+```typescript
+socket.emit('session-end', {
+  sid: 'abc123',
+  time: Date.now()
+})
+```
+
+**Behavior:**
+
+- Marks session as inactive
+- Notifies web clients via SSE
+- Stops timeout tracking
+
+---
+
+### update-metadata
+
+Update session metadata with optimistic locking.
+
+**Payload:**
+
+<ParamField name="sid" type="string" required>
+  Session ID
+</ParamField>
+
+<ParamField name="expectedVersion" type="number" required>
+  Expected metadata version
+</ParamField>
+
+<ParamField name="metadata" type="object" required>
+  New metadata object
+</ParamField>
+
+**Callback Response:**
+
+```typescript
+type Response = 
+  | { result: 'success', version: number, metadata: any }
+  | { result: 'version-mismatch', version: number, metadata: any }
+  | { result: 'error', reason?: string }
+```
+
+**Example:**
+
+```typescript
+socket.emit('update-metadata', {
+  sid: 'abc123',
+  expectedVersion: 5,
+  metadata: {
+    path: '/home/user/project',
+    host: 'laptop',
+    name: 'My Project'
+  }
+}, (response) => {
+  if (response.result === 'success') {
+    console.log('Metadata updated to version', response.version)
+  } else if (response.result === 'version-mismatch') {
+    console.log('Version mismatch, server at', response.version)
+  }
+})
+```
+
+**Behavior:**
+
+- Validates expected version
+- Increments version on success
+- Broadcasts update to session room
+- Returns new version or conflict
+
+---
+
+### update-state
+
+Update session agent state with optimistic locking.
+
+**Payload:**
+
+<ParamField name="sid" type="string" required>
+  Session ID
+</ParamField>
+
+<ParamField name="expectedVersion" type="number" required>
+  Expected state version
+</ParamField>
+
+<ParamField name="agentState" type="object" required>
+  New agent state object
+</ParamField>
+
+**Callback Response:**
+
+```typescript
+type Response = 
+  | { result: 'success', version: number, agentState: any }
+  | { result: 'version-mismatch', version: number, agentState: any }
+  | { result: 'error', reason?: string }
+```
+
+**Example:**
+
+```typescript
+socket.emit('update-state', {
+  sid: 'abc123',
+  expectedVersion: 3,
+  agentState: {
+    controlledByUser: true,
+    requests: {
+      'req_456': {
+        tool: 'edit',
+        arguments: { path: 'src/main.ts' },
+        createdAt: Date.now()
+      }
+    }
+  }
+}, (response) => {
+  if (response.result === 'success') {
+    console.log('State updated to version', response.version)
+  }
+})
+```
+
+---
+
+### machine-alive
+
+Keep machine online.
+
+**Payload:**
+
+<ParamField name="machineId" type="string" required>
+  Machine ID
+</ParamField>
+
+<ParamField name="time" type="number" required>
+  Unix timestamp (ms)
+</ParamField>
+
+**Example:**
+
+```typescript
+socket.emit('machine-alive', {
+  machineId: 'machine_xyz',
+  time: Date.now()
+})
+```
+
+**Behavior:**
+
+- Updates machine's `lastSeen` timestamp
+- Send every 10 seconds
+
+---
+
+### machine-update-metadata
+
+Update machine metadata.
+
+**Payload:**
+
+<ParamField name="machineId" type="string" required>
+  Machine ID
+</ParamField>
+
+<ParamField name="expectedVersion" type="number" required>
+  Expected metadata version
+</ParamField>
+
+<ParamField name="metadata" type="object" required>
+  New metadata
+</ParamField>
+
+**Callback:** Same as `update-metadata`
+
+---
+
+### machine-update-state
+
+Update machine runner state.
+
+**Payload:**
+
+<ParamField name="machineId" type="string" required>
+  Machine ID
+</ParamField>
+
+<ParamField name="expectedVersion" type="number" required>
+  Expected state version
+</ParamField>
+
+<ParamField name="runnerState" type="object" required>
+  New runner state
+</ParamField>
+
+**Callback:** Same as `update-state`
+
+---
+
+### rpc-register
+
+Register an RPC method handler.
+
+**Payload:**
+
+<ParamField name="method" type="string" required>
+  RPC method name (e.g., "uploadFile", "checkPathExists")
+</ParamField>
+
+**Example:**
+
+```typescript
+socket.emit('rpc-register', {
+  method: 'uploadFile'
+})
+
+// Handle RPC requests
+socket.on('rpc-request', async (data, callback) => {
+  if (data.method === 'uploadFile') {
+    const params = JSON.parse(data.params)
+    const result = await handleUploadFile(params)
+    callback(JSON.stringify(result))
+  }
+})
+```
+
+---
+
+### rpc-unregister
+
+Unregister an RPC method handler.
+
+**Payload:**
+
+<ParamField name="method" type="string" required>
+  RPC method name to unregister
+</ParamField>
+
+**Example:**
+
+```typescript
+socket.emit('rpc-unregister', {
+  method: 'uploadFile'
+})
+```
+
+---
+
+### terminal:ready
+
+Notify that terminal is ready.
+
+**Payload:**
+
+<ParamField name="sessionId" type="string" required>
+  Session ID
+</ParamField>
+
+<ParamField name="terminalId" type="string" required>
+  Terminal ID
+</ParamField>
+
+---
+
+### terminal:output
+
+Send terminal output.
+
+**Payload:**
+
+<ParamField name="sessionId" type="string" required>
+  Session ID
+</ParamField>
+
+<ParamField name="terminalId" type="string" required>
+  Terminal ID
+</ParamField>
+
+<ParamField name="data" type="string" required>
+  Terminal output data
+</ParamField>
+
+---
+
+### terminal:exit
+
+Notify terminal exit.
+
+**Payload:**
+
+<ParamField name="sessionId" type="string" required>
+  Session ID
+</ParamField>
+
+<ParamField name="terminalId" type="string" required>
+  Terminal ID
+</ParamField>
+
+<ParamField name="code" type="number" optional>
+  Exit code
+</ParamField>
+
+<ParamField name="signal" type="string" optional>
+  Exit signal
+</ParamField>
+
+---
+
+### terminal:error
+
+Notify terminal error.
+
+**Payload:**
+
+<ParamField name="sessionId" type="string" required>
+  Session ID
+</ParamField>
+
+<ParamField name="terminalId" type="string" required>
+  Terminal ID
+</ParamField>
+
+<ParamField name="message" type="string" required>
+  Error message
+</ParamField>
+
+---
+
+### ping
+
+Test connection latency.
+
+**Callback:** Immediate acknowledgment
+
+**Example:**
+
+```typescript
+const start = Date.now()
+socket.emit('ping', () => {
+  const latency = Date.now() - start
+  console.log('Latency:', latency, 'ms')
+})
+```
+
+---
+
+### usage-report
+
+Report usage statistics (internal).
+
+**Payload:** Arbitrary usage data
+
+---
+
+## Server to Client Events
+
+Events sent from hub to CLI.
+
+---
+
+### update
+
+Broadcast session/machine/message updates.
+
+**Payload:**
+
+<ResponseField name="id" type="string">
+  Update ID
+</ResponseField>
+
+<ResponseField name="seq" type="number">
+  Sequence number
+</ResponseField>
+
+<ResponseField name="createdAt" type="number">
+  Unix timestamp (ms)
+</ResponseField>
+
+<ResponseField name="body" type="object">
+  Update body (varies by type)
+</ResponseField>
+
+**Update Types:**
+
+#### new-message
+
+```typescript
+{
+  t: 'new-message',
+  sid: 'abc123',
+  message: {
+    id: 'msg_xyz',
+    seq: 42,
+    createdAt: 1709856000000,
+    localId: 'local-123',
+    content: {...}
+  }
+}
+```
+
+#### update-session
+
+```typescript
+{
+  t: 'update-session',
+  sid: 'abc123',
+  metadata: {
+    version: 6,
+    value: {...}
+  },
+  agentState: {
+    version: 4,
+    value: {...}
+  }
+}
+```
+
+#### update-machine
+
+```typescript
+{
+  t: 'update-machine',
+  machineId: 'machine_xyz',
+  metadata: {
+    version: 2,
+    value: {...}
+  },
+  runnerState: {
+    version: 1,
+    value: {...}
+  }
+}
+```
+
+**Example:**
+
+```typescript
+socket.on('update', (update) => {
+  if (update.body.t === 'new-message') {
+    console.log('New message:', update.body.message)
+  } else if (update.body.t === 'update-session') {
+    console.log('Session updated:', update.body.sid)
+  }
+})
+```
+
+---
+
+### rpc-request
+
+Receive RPC method call from hub.
+
+**Payload:**
+
+<ResponseField name="method" type="string">
+  RPC method name
+</ResponseField>
+
+<ResponseField name="params" type="string">
+  JSON-encoded parameters
+</ResponseField>
+
+**Callback:** Return JSON-encoded result
+
+**Example:**
+
+```typescript
+socket.on('rpc-request', async (data, callback) => {
+  const { method, params } = data
+  const parsedParams = JSON.parse(params)
+  
+  try {
+    let result
+    if (method === 'uploadFile') {
+      result = await handleUploadFile(parsedParams)
+    } else if (method === 'checkPathExists') {
+      result = await handleCheckPath(parsedParams)
+    } else {
+      result = { success: false, error: 'Unknown method' }
+    }
+    callback(JSON.stringify(result))
+  } catch (error) {
+    callback(JSON.stringify({
+      success: false,
+      error: error.message
+    }))
+  }
+})
+```
+
+---
+
+### terminal:open
+
+Open a terminal for a session.
+
+**Payload:**
+
+<ResponseField name="sessionId" type="string">
+  Session ID
+</ResponseField>
+
+<ResponseField name="terminalId" type="string">
+  Terminal ID
+</ResponseField>
+
+<ResponseField name="cols" type="number">
+  Terminal columns
+</ResponseField>
+
+<ResponseField name="rows" type="number">
+  Terminal rows
+</ResponseField>
+
+---
+
+### terminal:write
+
+Write input to terminal.
+
+**Payload:**
+
+<ResponseField name="sessionId" type="string">
+  Session ID
+</ResponseField>
+
+<ResponseField name="terminalId" type="string">
+  Terminal ID
+</ResponseField>
+
+<ResponseField name="data" type="string">
+  Input data
+</ResponseField>
+
+---
+
+### terminal:resize
+
+Resize terminal dimensions.
+
+**Payload:**
+
+<ResponseField name="sessionId" type="string">
+  Session ID
+</ResponseField>
+
+<ResponseField name="terminalId" type="string">
+  Terminal ID
+</ResponseField>
+
+<ResponseField name="cols" type="number">
+  New columns
+</ResponseField>
+
+<ResponseField name="rows" type="number">
+  New rows
+</ResponseField>
+
+---
+
+### terminal:close
+
+Close terminal.
+
+**Payload:**
+
+<ResponseField name="sessionId" type="string">
+  Session ID
+</ResponseField>
+
+<ResponseField name="terminalId" type="string">
+  Terminal ID
+</ResponseField>
+
+---
+
+### error
+
+Socket error notification.
+
+**Payload:**
+
+<ResponseField name="message" type="string">
+  Error message
+</ResponseField>
+
+<ResponseField name="code" type="string" optional>
+  Error code: `namespace-missing`, `access-denied`, or `not-found`
+</ResponseField>
+
+<ResponseField name="scope" type="string" optional>
+  Error scope: `session` or `machine`
+</ResponseField>
+
+<ResponseField name="id" type="string" optional>
+  Session or machine ID
+</ResponseField>
+
+**Example:**
+
+```typescript
+socket.on('error', (data) => {
+  console.error('Socket error:', data.message)
+  if (data.code === 'access-denied') {
+    console.error('Access denied to', data.scope, data.id)
+  }
+})
+```

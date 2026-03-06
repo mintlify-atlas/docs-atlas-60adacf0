@@ -1,0 +1,329 @@
+---
+title: 'Authentication Commands'
+description: 'Manage CLI authentication and API tokens'
+---
+
+## Overview
+
+HAPI CLI uses the `CLI_API_TOKEN` to authenticate with the HAPI hub. Authentication commands help you configure and manage this token.
+
+## Token Priority
+
+Tokens are loaded in the following order (highest to lowest priority):
+
+1. `CLI_API_TOKEN` environment variable
+2. Token saved in `~/.hapi/settings.json` (via `hapi auth login`)
+3. Interactive prompt on first run
+
+## Commands
+
+### hapi auth status
+
+Display current authentication configuration and token status.
+
+```bash
+hapi auth status
+```
+
+#### Output Example
+
+```bash
+$ hapi auth status
+
+Direct Connect Status
+
+  HAPI_API_URL: http://localhost:3006
+  CLI_API_TOKEN: set
+  Token Source: environment
+  Machine ID: machine-abc123
+  Host: my-laptop.local
+```
+
+#### When Token Is Missing
+
+```bash
+$ hapi auth status
+
+Direct Connect Status
+
+  HAPI_API_URL: http://localhost:3006
+  CLI_API_TOKEN: missing
+  Token Source: none
+  Machine ID: not set
+  Host: my-laptop.local
+
+  Token not configured. To get your token:
+    1. Check the server startup logs (first run shows generated token)
+    2. Read ~/.hapi/settings.json on the server
+    3. Ask your server administrator (if token is set via env var)
+
+  Then run: hapi auth login
+```
+
+---
+
+### hapi auth login
+
+Interactively enter and save your `CLI_API_TOKEN` to the settings file.
+
+```bash
+hapi auth login
+```
+
+<Note>
+  This command requires an interactive TTY. For non-interactive environments, use the `CLI_API_TOKEN` environment variable instead.
+</Note>
+
+#### Interactive Prompt
+
+```bash
+$ hapi auth login
+Enter CLI_API_TOKEN: **********************
+
+Token saved to /home/user/.hapi/settings.json
+```
+
+#### Token Storage
+
+The token is saved to `~/.hapi/settings.json` (or `$HAPI_HOME/settings.json` if `HAPI_HOME` is set):
+
+```json
+{
+  "cliApiToken": "your-token-here",
+  "machineId": "machine-abc123",
+  "apiUrl": "http://localhost:3006"
+}
+```
+
+---
+
+### hapi auth logout
+
+Clear saved credentials (token and machine ID) from the local settings file.
+
+```bash
+hapi auth logout
+```
+
+<Warning>
+  This only removes the token from `settings.json`. If `CLI_API_TOKEN` is set as an environment variable, it will still be used.
+</Warning>
+
+#### Output Example
+
+```bash
+$ hapi auth logout
+Cleared local credentials (token and machineId).
+Note: If CLI_API_TOKEN is set via environment variable, it will still be used.
+```
+
+---
+
+## Getting Your Token
+
+There are several ways to obtain your `CLI_API_TOKEN`:
+
+### 1. From Server Startup Logs
+
+When the HAPI hub starts for the first time, it generates and displays the token:
+
+```bash
+$ hapi hub
+[INFO] Generated new CLI_API_TOKEN: hapi_abc123xyz789...
+[INFO] Save this token to connect CLI clients
+```
+
+### 2. From Server Settings File
+
+On the server machine, read `~/.hapi/settings.json`:
+
+```bash
+cat ~/.hapi/settings.json
+```
+
+### 3. From Environment Variable
+
+If your administrator set the token via environment variable, ask them for the value:
+
+```bash
+echo $CLI_API_TOKEN
+```
+
+---
+
+## Using Environment Variables
+
+For automation or CI/CD, set the token directly as an environment variable:
+
+```bash
+export CLI_API_TOKEN=your-token-here
+export HAPI_API_URL=https://your-hub.com
+hapi
+```
+
+### In Shell Configuration
+
+Add to your `~/.bashrc`, `~/.zshrc`, or equivalent:
+
+```bash
+# HAPI Configuration
+export CLI_API_TOKEN=your-token-here
+export HAPI_API_URL=https://your-hub.com
+```
+
+### In CI/CD
+
+```yaml
+# GitHub Actions example
+env:
+  CLI_API_TOKEN: ${{ secrets.HAPI_CLI_TOKEN }}
+  HAPI_API_URL: https://your-hub.com
+
+steps:
+  - name: Run HAPI session
+    run: hapi codex --yolo
+```
+
+---
+
+## Machine ID
+
+The machine ID uniquely identifies your computer to the HAPI hub. It's automatically generated on first connection.
+
+### Viewing Machine ID
+
+```bash
+hapi auth status
+```
+
+### Clearing Machine ID
+
+The machine ID is cleared when you run `hapi auth logout`:
+
+```bash
+hapi auth logout  # Clears both token and machine ID
+```
+
+### Multiple Namespaces
+
+If you use multiple HAPI hubs or namespaces, each needs its own machine ID. Use separate `HAPI_HOME` directories:
+
+```bash
+# Namespace 1
+export HAPI_HOME=~/.hapi-namespace1
+export CLI_API_TOKEN=token-for-namespace1
+hapi
+
+# Namespace 2
+export HAPI_HOME=~/.hapi-namespace2
+export CLI_API_TOKEN=token-for-namespace2
+hapi
+```
+
+---
+
+## Troubleshooting
+
+### Authentication Error
+
+If you see "Authentication error" or "Unauthorized":
+
+1. Verify token is set:
+   ```bash
+   hapi auth status
+   ```
+
+2. Re-login with correct token:
+   ```bash
+   hapi auth login
+   ```
+
+3. Check hub URL:
+   ```bash
+   echo $HAPI_API_URL
+   ```
+
+### Machine Access Denied
+
+If you see "Machine access denied":
+
+```
+Machine access denied.
+  This machineId is already registered under a different namespace.
+  Fix: run `hapi auth logout`, or set a separate HAPI_HOME per namespace.
+```
+
+This means your machine ID is registered with a different token/namespace. Fix by:
+
+1. Logout and re-login:
+   ```bash
+   hapi auth logout
+   hapi auth login
+   ```
+
+2. Or use separate HAPI_HOME:
+   ```bash
+   export HAPI_HOME=~/.hapi-other-namespace
+   hapi
+   ```
+
+### Non-TTY Environment
+
+If you see "Cannot prompt for token in non-TTY environment":
+
+```bash
+# Use environment variable instead
+export CLI_API_TOKEN=your-token-here
+hapi
+```
+
+---
+
+## Security Best Practices
+
+<Warning>
+  Your `CLI_API_TOKEN` is a sensitive credential. Treat it like a password.
+</Warning>
+
+### Do:
+- Store tokens securely (use secrets managers in CI/CD)
+- Use separate tokens per environment (dev/staging/prod)
+- Rotate tokens periodically
+- Use environment variables for automation
+
+### Don't:
+- Commit tokens to version control
+- Share tokens in plain text
+- Use the same token across different systems
+- Log or display tokens in output
+
+---
+
+## Help
+
+View authentication help:
+
+```bash
+hapi auth --help
+```
+
+**Output:**
+```
+hapi auth - Authentication management
+
+Usage:
+  hapi auth status            Show current configuration
+  hapi auth login             Enter and save CLI_API_TOKEN
+  hapi auth logout            Clear saved credentials
+
+Token priority (highest to lowest):
+  1. CLI_API_TOKEN environment variable
+  2. ~/.hapi/settings.json
+  3. Interactive prompt (on first run)
+```
+
+## Next Steps
+
+- [Environment Variables](/cli/environment-variables) - Configure hub URL and more
+- [Settings File](/cli/settings-file) - Understand the settings.json structure
+- [Session Commands](/cli/session-commands) - Start your first session

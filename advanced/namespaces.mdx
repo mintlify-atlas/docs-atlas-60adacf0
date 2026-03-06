@@ -1,0 +1,229 @@
+---
+title: Namespaces
+description: Multi-user isolation for shared HAPI hubs
+---
+
+Namespaces enable small teams to share a single public HAPI hub while maintaining complete isolation of sessions, machines, and user data. Each team member uses a different namespace to isolate their resources without running separate hub instances.
+
+<Note>
+Namespaces are an advanced feature for specific deployment scenarios. Most users should run their own hub instance instead.
+</Note>
+
+## How Namespaces Work
+
+The hub uses a single base `CLI_API_TOKEN` for authentication. Clients append `:<namespace>` to the token to create isolated workspaces within the same hub instance.
+
+<CardGroup cols={2}>
+  <Card title="Hub Configuration" icon="server">
+    Configure only the base token without any namespace suffix
+  </Card>
+  <Card title="Client Configuration" icon="users">
+    Each user appends their unique namespace to the base token
+  </Card>
+</CardGroup>
+
+## Setup
+
+### 1. Configure the Hub
+
+On the hub server, set only the base token without any namespace:
+
+```bash
+export CLI_API_TOKEN="your-base-token"
+```
+
+<Warning>
+The hub-side `CLI_API_TOKEN` must NOT include a `:<namespace>` suffix. If it does, the hub will strip the suffix and log a warning.
+</Warning>
+
+### 2. Configure Client Tokens
+
+For each user, append a unique namespace to the base token:
+
+**Alice's configuration:**
+```bash
+export CLI_API_TOKEN="your-base-token:alice"
+```
+
+**Bob's configuration:**
+```bash
+export CLI_API_TOKEN="your-base-token:bob"
+```
+
+### 3. Web Login and Telegram
+
+When using web login or binding Telegram accounts, always use the full `base:namespace` token format:
+
+```bash
+# Web login
+hapi auth login
+# Enter: your-base-token:alice
+
+# Telegram binding
+# Use: your-base-token:alice when prompted in the Mini App
+```
+
+## Use Cases
+
+<AccordionGroup>
+  <Accordion title="Small Team Collaboration">
+    A team of 3-5 developers sharing a single VPS or cloud instance. Each developer gets their own namespace for complete isolation while sharing infrastructure costs.
+  </Accordion>
+
+  <Accordion title="Multi-Environment Testing">
+    Use different namespaces for development, staging, and testing environments on the same hub instance.
+  </Accordion>
+
+  <Accordion title="Client Projects">
+    Agencies managing multiple client projects can use namespaces to separate client sessions on a single hub.
+  </Accordion>
+</AccordionGroup>
+
+## Namespace Isolation
+
+Namespaces provide complete isolation of:
+
+- **Sessions**: Each namespace has its own set of AI coding sessions
+- **Machines**: Machine registrations are namespace-scoped
+- **Users**: Telegram bindings and web users are isolated per namespace
+- **Data**: All session data, messages, and metadata are namespace-scoped
+
+<Info>
+Sessions, machines, and users in one namespace are completely invisible to other namespaces.
+</Info>
+
+## Limitations and Gotchas
+
+### Machine ID Conflicts
+
+One machine ID cannot be reused across namespaces. To run multiple namespaces on the same physical machine, you have two options:
+
+<CodeGroup>
+```bash Option 1: Separate HAPI_HOME
+# Alice's environment
+export HAPI_HOME=~/.hapi-alice
+export CLI_API_TOKEN="your-base-token:alice"
+
+# Bob's environment
+export HAPI_HOME=~/.hapi-bob
+export CLI_API_TOKEN="your-base-token:bob"
+```
+
+```bash Option 2: Clear machine ID
+# Switch from Alice to Bob
+hapi auth logout
+export CLI_API_TOKEN="your-base-token:bob"
+hapi auth login
+```
+</CodeGroup>
+
+### Remote Spawn Limitations
+
+Remote spawn (via the HAPI runner) is namespace-scoped. If you need remote spawning for multiple namespaces on the same machine, run a separate runner per namespace using different `HAPI_HOME` directories.
+
+```bash
+# Alice's runner
+export HAPI_HOME=~/.hapi-alice
+export CLI_API_TOKEN="your-base-token:alice"
+hapi runner start
+
+# Bob's runner (in a different terminal)
+export HAPI_HOME=~/.hapi-bob
+export CLI_API_TOKEN="your-base-token:bob"
+hapi runner start
+```
+
+### Token Format Requirements
+
+<Warning>
+**Hub configuration:** `CLI_API_TOKEN="base-token"` (no colon)
+
+**Client configuration:** `CLI_API_TOKEN="base-token:namespace"`
+
+Mixing these up will cause authentication failures.
+</Warning>
+
+## Token Format Reference
+
+The namespace is specified using a colon separator:
+
+```
+CLI_API_TOKEN:<namespace>
+```
+
+**Valid examples:**
+- `secret-token-123:alice`
+- `my-team-token:dev`
+- `prod-token:staging-env`
+
+**Invalid examples:**
+- `secret-token-123` (no namespace - will use default/no isolation)
+- `secret-token-123:alice:extra` (multiple colons not supported)
+- `:alice` (missing base token)
+
+## Security Considerations
+
+<Warning>
+Namespaces provide logical isolation, not cryptographic security. All namespaces share:
+
+- The same base authentication token
+- The same hub infrastructure
+- The same database
+
+For true security isolation, run separate hub instances with different tokens.
+</Warning>
+
+## Telegram Integration
+
+When binding a Telegram account to a namespace:
+
+1. Open the Telegram Mini App from your bot
+2. Click the binding prompt
+3. Enter the full token with namespace: `your-base-token:alice`
+4. The Telegram account is now bound to the `alice` namespace
+
+<Note>
+Each Telegram account can only be bound to one namespace at a time. To switch namespaces, unbind and rebind with a different namespace token.
+</Note>
+
+## Monitoring and Management
+
+Namespaces are transparent to most HAPI operations:
+
+```bash
+# List sessions (shows only your namespace)
+hapi runner list
+
+# Check runner status (namespace-scoped)
+hapi runner status
+
+# View diagnostics (shows your namespace configuration)
+hapi doctor
+```
+
+The hub logs will show which namespace each operation belongs to for debugging purposes.
+
+## Migration Between Namespaces
+
+<Warning>
+There is no built-in migration tool for moving sessions or data between namespaces. If you need to switch namespaces, you'll need to start fresh sessions.
+</Warning>
+
+To switch a machine to a different namespace:
+
+1. Stop all active sessions: `hapi runner stop`
+2. Clear credentials: `hapi auth logout`
+3. Update your token: `export CLI_API_TOKEN="your-base-token:new-namespace"`
+4. Re-authenticate: `hapi auth login`
+5. Start new sessions with the new namespace
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="Runner" href="/advanced/runner" icon="rocket">
+    Background runner for long-running sessions
+  </Card>
+  <Card title="Configuration" href="/advanced/configuration" icon="gear">
+    Environment variables and settings
+  </Card>
+</CardGroup>

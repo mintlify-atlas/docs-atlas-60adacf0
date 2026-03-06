@@ -1,0 +1,546 @@
+---
+title: 'Hub Command'
+description: 'Start the bundled HAPI hub server'
+---
+
+## Overview
+
+The HAPI CLI includes a bundled hub server that provides the web interface and API for remote session control. The hub command starts this server locally.
+
+## Commands
+
+### hapi hub
+
+Start the HAPI hub server.
+
+```bash
+hapi hub [options]
+```
+
+<ParamField path="--host" type="string">
+  Set the host interface to bind to
+  
+  ```bash
+  hapi hub --host 0.0.0.0
+  ```
+  
+  Default: `127.0.0.1` (localhost only)
+</ParamField>
+
+<ParamField path="--port" type="string">
+  Set the HTTP port to listen on
+  
+  ```bash
+  hapi hub --port 3006
+  ```
+  
+  Default: `3006`
+</ParamField>
+
+### hapi server
+
+Alias for `hapi hub`. Both commands are identical.
+
+```bash
+hapi server [options]
+```
+
+---
+
+## Examples
+
+### Start Hub on Default Port
+
+```bash
+$ hapi hub
+[INFO] HAPI hub starting...
+[INFO] Generated CLI_API_TOKEN: hapi_abc123xyz789...
+[INFO] Save this token to connect CLI clients
+✓ Hub listening on http://127.0.0.1:3006
+✓ Socket.IO server ready
+✓ Web app available at http://127.0.0.1:3006
+```
+
+### Start on Custom Port
+
+```bash
+hapi hub --port 8080
+```
+
+**Output:**
+```
+✓ Hub listening on http://127.0.0.1:8080
+```
+
+### Bind to All Interfaces
+
+To allow remote connections from other machines:
+
+```bash
+hapi hub --host 0.0.0.0 --port 3006
+```
+
+**Output:**
+```
+✓ Hub listening on http://0.0.0.0:3006
+✓ Accessible from: http://192.168.1.100:3006
+```
+
+<Warning>
+  Binding to `0.0.0.0` exposes your hub to your local network. Use firewall rules or VPN for security.
+</Warning>
+
+### Using --host= and --port= Syntax
+
+```bash
+hapi hub --host=0.0.0.0 --port=3006
+```
+
+---
+
+## Environment Variables
+
+You can also configure the hub via environment variables:
+
+<ParamField path="WEBAPP_HOST" type="string">
+  Host interface to bind (overridden by `--host` flag)
+  
+  ```bash
+  export WEBAPP_HOST=0.0.0.0
+  hapi hub
+  ```
+</ParamField>
+
+<ParamField path="WEBAPP_PORT" type="string">
+  HTTP port to listen on (overridden by `--port` flag)
+  
+  ```bash
+  export WEBAPP_PORT=8080
+  hapi hub
+  ```
+</ParamField>
+
+<ParamField path="CLI_API_TOKEN" type="string">
+  Shared secret for CLI authentication. If not set, hub generates one on first start.
+  
+  ```bash
+  export CLI_API_TOKEN=your-secure-token-here
+  hapi hub
+  ```
+</ParamField>
+
+### Example with Environment Variables
+
+```bash
+export WEBAPP_HOST=0.0.0.0
+export WEBAPP_PORT=3006
+export CLI_API_TOKEN=my-secure-token-123
+hapi hub
+```
+
+---
+
+## What the Hub Does
+
+The HAPI hub provides several services:
+
+### 1. Web Interface
+
+A React PWA for controlling sessions:
+- View active sessions
+- Send messages to agents
+- Monitor session output
+- Switch between local and remote mode
+- View session files and terminal output
+
+### 2. REST API
+
+HTTP endpoints for:
+- Creating and listing sessions
+- Sending messages
+- Managing machines
+- User authentication
+
+See hub API documentation for details.
+
+### 3. Socket.IO Server
+
+Real-time bidirectional communication:
+- CLI connects to hub via Socket.IO
+- Streams session events to hub
+- Receives RPC commands from hub
+- Broadcasts updates to web clients
+
+### 4. SSE (Server-Sent Events)
+
+One-way streaming for web clients:
+- Live session updates
+- New message notifications
+- Session state changes
+
+### 5. Telegram Bot (Optional)
+
+If configured, the hub runs a Telegram bot for mobile control.
+
+---
+
+## First-Time Setup
+
+### 1. Start the Hub
+
+```bash
+hapi hub
+```
+
+### 2. Save the Token
+
+On first run, the hub generates a `CLI_API_TOKEN`:
+
+```
+[INFO] Generated new CLI_API_TOKEN: hapi_abc123xyz789...
+[INFO] Save this token to connect CLI clients
+```
+
+**Copy this token** - you'll need it to connect CLI clients.
+
+### 3. Configure CLI Clients
+
+On each machine where you want to run sessions:
+
+```bash
+export CLI_API_TOKEN=hapi_abc123xyz789...
+export HAPI_API_URL=http://your-hub:3006
+hapi auth login
+```
+
+### 4. Access Web Interface
+
+Open your browser to:
+```
+http://localhost:3006
+```
+
+---
+
+## Hub Data Storage
+
+The hub stores data in `~/.hapi/` on the server machine:
+
+```
+~/.hapi/
+├── settings.json          # Hub configuration and token
+├── database.sqlite        # Sessions, messages, machines
+└── logs/
+    └── hub-2026-03-06.log # Hub logs
+```
+
+### Settings File
+
+The hub's `settings.json` contains:
+
+```json
+{
+  "cliApiToken": "hapi_abc123xyz789...",
+  "generatedAt": "2026-03-06T08:00:00.000Z"
+}
+```
+
+---
+
+## Single Binary Workflow
+
+The HAPI CLI can be built as an all-in-one executable that includes:
+- CLI commands
+- Hub server
+- Web app assets
+
+This allows you to run the entire HAPI stack from a single binary:
+
+```bash
+# Start hub
+./hapi hub
+
+# In another terminal, start session
+./hapi
+```
+
+See the [installation guide](/installation) for building single binaries.
+
+---
+
+## Production Deployment
+
+### Using systemd (Linux)
+
+Create `/etc/systemd/system/hapi-hub.service`:
+
+```ini
+[Unit]
+Description=HAPI Hub Server
+After=network.target
+
+[Service]
+Type=simple
+User=hapi
+WorkingDirectory=/home/hapi
+Environment="WEBAPP_HOST=0.0.0.0"
+Environment="WEBAPP_PORT=3006"
+Environment="CLI_API_TOKEN=your-secure-token"
+ExecStart=/usr/local/bin/hapi hub
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+
+```bash
+sudo systemctl enable hapi-hub
+sudo systemctl start hapi-hub
+sudo systemctl status hapi-hub
+```
+
+### Using Docker
+
+```dockerfile
+FROM node:20-alpine
+
+RUN npm install -g @twsxtd/hapi
+
+ENV WEBAPP_HOST=0.0.0.0
+ENV WEBAPP_PORT=3006
+
+EXPOSE 3006
+
+CMD ["hapi", "hub"]
+```
+
+Build and run:
+
+```bash
+docker build -t hapi-hub .
+docker run -d \
+  -p 3006:3006 \
+  -e CLI_API_TOKEN=your-token \
+  -v ~/.hapi:/root/.hapi \
+  hapi-hub
+```
+
+### Using PM2
+
+```bash
+# Install PM2
+npm install -g pm2
+
+# Start hub
+CLI_API_TOKEN=your-token pm2 start hapi --name hapi-hub -- hub --host 0.0.0.0
+
+# Save PM2 configuration
+pm2 save
+
+# Setup startup script
+pm2 startup
+```
+
+---
+
+## Reverse Proxy Setup
+
+### Nginx
+
+```nginx
+server {
+    listen 80;
+    server_name hapi.example.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:3006;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Socket.IO specific
+    location /socket.io/ {
+        proxy_pass http://127.0.0.1:3006/socket.io/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_buffering off;
+    }
+}
+```
+
+### Caddy
+
+```
+hapi.example.com {
+    reverse_proxy localhost:3006
+}
+```
+
+---
+
+## Security Considerations
+
+<Warning>
+  The hub manages your AI agent sessions. Secure it appropriately.
+</Warning>
+
+### 1. Use Strong Tokens
+
+```bash
+# Generate secure token
+export CLI_API_TOKEN=$(openssl rand -hex 32)
+hapi hub
+```
+
+### 2. Enable HTTPS
+
+Use a reverse proxy (nginx, Caddy) with SSL/TLS certificates.
+
+### 3. Restrict Host Binding
+
+For local-only access:
+```bash
+hapi hub --host 127.0.0.1
+```
+
+For network access with firewall:
+```bash
+hapi hub --host 0.0.0.0
+sudo ufw allow from 192.168.1.0/24 to any port 3006
+```
+
+### 4. Use VPN for Remote Access
+
+Instead of exposing hub publicly, use:
+- Tailscale
+- WireGuard
+- OpenVPN
+
+### 5. Regular Updates
+
+```bash
+npm update -g @twsxtd/hapi
+```
+
+---
+
+## Troubleshooting
+
+### Port Already in Use
+
+```bash
+# Check what's using the port
+lsof -i :3006
+
+# Use different port
+hapi hub --port 3007
+```
+
+### Cannot Bind to Host
+
+```bash
+# Permission denied for ports < 1024
+sudo hapi hub --port 80
+
+# Or use port >= 1024
+hapi hub --port 8080
+```
+
+### CLI Cannot Connect
+
+**Check hub is running:**
+```bash
+curl http://localhost:3006/health
+```
+
+**Check token matches:**
+```bash
+# On server
+cat ~/.hapi/settings.json
+
+# On client
+hapi auth status
+```
+
+**Check URL:**
+```bash
+export HAPI_API_URL=http://your-hub:3006
+hapi auth status
+```
+
+### Hub Crashes on Start
+
+**View logs:**
+```bash
+cat ~/.hapi/logs/hub-*.log
+```
+
+**Check for conflicting processes:**
+```bash
+ps aux | grep hapi
+```
+
+**Clean state and restart:**
+```bash
+hapi doctor clean
+hapi hub
+```
+
+---
+
+## Monitoring
+
+### Health Check Endpoint
+
+The hub exposes a health check endpoint:
+
+```bash
+curl http://localhost:3006/health
+```
+
+### Logs
+
+Hub logs are stored in `~/.hapi/logs/`:
+
+```bash
+# View latest log
+tail -f ~/.hapi/logs/hub-$(date +%Y-%m-%d).log
+
+# Search for errors
+grep ERROR ~/.hapi/logs/hub-*.log
+```
+
+### Metrics
+
+View hub metrics via the web interface:
+```
+http://localhost:3006/admin/metrics
+```
+
+---
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/cli/auth-commands">
+    Configure CLI_API_TOKEN for hub connection
+  </Card>
+  <Card title="Environment Variables" icon="gear" href="/cli/environment-variables">
+    All hub configuration options
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+- [Session Commands](/cli/session-commands) - Start sessions that connect to your hub
+- [Environment Variables](/cli/environment-variables) - Configure hub and CLI settings
+- [Diagnostics](/cli/diagnostics) - Troubleshoot hub and CLI issues

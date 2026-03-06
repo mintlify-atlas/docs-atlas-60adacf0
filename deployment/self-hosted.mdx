@@ -1,0 +1,296 @@
+---
+title: Self-Hosted Deployment
+description: Run HAPI hub without relay using public IP or reverse proxy
+---
+
+Self-hosted deployment gives you complete control over your HAPI infrastructure. The hub runs locally or on your own server, accessible via public IP, reverse proxy, or VPN.
+
+## Requirements
+
+- Public IP address **or** port forwarding **or** reverse proxy (Nginx, Caddy, etc.)
+- HTTPS recommended for production (use Let's Encrypt or similar)
+- Access to firewall configuration (if applicable)
+
+## Basic setup
+
+<Steps>
+  <Step title="Start hub without relay">
+    ```bash
+    hapi hub
+    # or explicitly
+    hapi hub --no-relay
+    ```
+
+    By default, the hub listens on `http://127.0.0.1:3006`.
+  </Step>
+
+  <Step title="Configure network access">
+    Make the hub accessible from remote machines:
+
+    ```bash
+    export HAPI_LISTEN_HOST=0.0.0.0
+    export HAPI_LISTEN_PORT=3006
+    hapi hub
+    ```
+
+    <Warning>
+      Binding to `0.0.0.0` exposes the hub to your network. Use firewall rules to restrict access.
+    </Warning>
+  </Step>
+
+  <Step title="Access the hub">
+    Access via:
+    - **Local network**: `http://192.168.x.x:3006`
+    - **Public IP**: `http://your-public-ip:3006`
+    - **Domain**: `https://your-domain.com` (with reverse proxy)
+  </Step>
+</Steps>
+
+## Configuration
+
+### Environment variables
+
+| Variable | Default | settings.json | Description |
+|----------|---------|---------------|-------------|
+| `HAPI_LISTEN_HOST` | `127.0.0.1` | `listenHost` | HTTP bind address |
+| `HAPI_LISTEN_PORT` | `3006` | `listenPort` | HTTP port |
+| `HAPI_PUBLIC_URL` | - | `publicUrl` | Public URL for external access |
+| `CORS_ORIGINS` | - | `corsOrigins` | Allowed CORS origins (comma-separated) |
+| `CLI_API_TOKEN` | Auto-generated | `cliApiToken` | Authentication token |
+
+<Note>
+  Configuration priority: **ENV > settings.json > default**
+</Note>
+
+### settings.json example
+
+Create or edit `~/.hapi/settings.json`:
+
+```json
+{
+  "$schema": "https://hapi.run/docs/schemas/settings.schema.json",
+  "listenHost": "0.0.0.0",
+  "listenPort": 3006,
+  "publicUrl": "https://hapi.yourdomain.com"
+}
+```
+
+## HTTPS setup
+
+### Option 1: Reverse proxy (recommended)
+
+Use Nginx or Caddy to handle HTTPS certificates:
+
+<Tabs>
+  <Tab title="Caddy">
+    ```caddyfile
+    hapi.yourdomain.com {
+        reverse_proxy localhost:3006
+    }
+    ```
+
+    Caddy automatically obtains and renews Let's Encrypt certificates.
+  </Tab>
+
+  <Tab title="Nginx">
+    ```nginx
+    server {
+        listen 443 ssl http2;
+        server_name hapi.yourdomain.com;
+
+        ssl_certificate /etc/letsencrypt/live/hapi.yourdomain.com/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/hapi.yourdomain.com/privkey.pem;
+
+        location / {
+            proxy_pass http://localhost:3006;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+    ```
+
+    Obtain certificates with certbot:
+    ```bash
+    sudo certbot --nginx -d hapi.yourdomain.com
+    ```
+  </Tab>
+</Tabs>
+
+### Option 2: Self-signed certificates (development)
+
+<Warning>
+  Self-signed certificates require additional configuration and are not recommended for production.
+</Warning>
+
+If using self-signed certificates, the CLI needs to trust them:
+
+```bash
+# Preferred: trust your own CA
+export NODE_EXTRA_CA_CERTS="/path/to/your-ca.pem"
+
+# Dev-only workaround: disable TLS verification (INSECURE)
+export NODE_TLS_REJECT_UNAUTHORIZED=0
+```
+
+## CORS configuration
+
+If accessing the hub from a different origin (e.g., standalone web app):
+
+```bash
+export CORS_ORIGINS="https://app.yourdomain.com,https://hapi.yourdomain.com"
+hapi hub
+```
+
+Or in `settings.json`:
+
+```json
+{
+  "corsOrigins": "https://app.yourdomain.com,https://hapi.yourdomain.com"
+}
+```
+
+<Note>
+  If `HAPI_PUBLIC_URL` is set, it's automatically added to CORS origins.
+</Note>
+
+## Firewall configuration
+
+### UFW (Ubuntu/Debian)
+
+```bash
+# Allow from specific network
+sudo ufw allow from 192.168.1.0/24 to any port 3006
+
+# Allow from anywhere (be cautious)
+sudo ufw allow 3006
+```
+
+### firewalld (RHEL/CentOS)
+
+```bash
+sudo firewall-cmd --permanent --add-port=3006/tcp
+sudo firewall-cmd --reload
+```
+
+## CLI configuration
+
+If the hub is not on localhost, configure the CLI:
+
+```bash
+export HAPI_API_URL="http://your-hub:3006"
+export CLI_API_TOKEN="your-token-here"
+hapi
+```
+
+Or use interactive login:
+
+```bash
+hapi auth login
+# Enter hub URL and token when prompted
+```
+
+## Production deployment
+
+<Steps>
+  <Step title="Set up reverse proxy">
+    Configure Nginx or Caddy with HTTPS certificates.
+  </Step>
+
+  <Step title="Create configuration">
+    ```json
+    {
+      "listenHost": "127.0.0.1",
+      "listenPort": 3006,
+      "publicUrl": "https://hapi.yourdomain.com",
+      "corsOrigins": "https://hapi.yourdomain.com"
+    }
+    ```
+  </Step>
+
+  <Step title="Enable background service">
+    ```bash
+    # Using systemd (Linux)
+    systemctl --user enable hapi-hub
+    systemctl --user start hapi-hub
+
+    # Using pm2
+    pm2 start "hapi hub" --name hapi-hub
+    pm2 save
+    pm2 startup
+    ```
+  </Step>
+
+  <Step title="Configure firewall">
+    Allow connections only from reverse proxy:
+    ```bash
+    sudo ufw allow from 127.0.0.1 to any port 3006
+    ```
+  </Step>
+</Steps>
+
+## Security considerations
+
+<CardGroup cols={2}>
+  <Card title="Use HTTPS" icon="lock">
+    Always use HTTPS in production. Use Let's Encrypt for free certificates.
+  </Card>
+
+  <Card title="Restrict CORS" icon="shield">
+    Only allow trusted origins in `CORS_ORIGINS` to prevent unauthorized access.
+  </Card>
+
+  <Card title="Firewall rules" icon="firewall">
+    Use firewall rules to restrict access to the hub port.
+  </Card>
+
+  <Card title="Rotate tokens" icon="key">
+    Keep `CLI_API_TOKEN` secret and rotate if compromised.
+  </Card>
+</CardGroup>
+
+## When to use self-hosted
+
+Self-hosted deployment is ideal when:
+
+- You have a public IP or VPS
+- You want complete control over infrastructure
+- You need custom SSL certificates
+- You're deploying for a team or organization
+- You want to avoid third-party relay servers
+
+## Troubleshooting
+
+### Cannot connect from remote machine
+
+1. Verify `HAPI_LISTEN_HOST` is `0.0.0.0` or your public IP
+2. Check firewall allows port 3006
+3. Test with `curl http://your-ip:3006/api/health`
+
+### CORS errors in browser
+
+1. Set `CORS_ORIGINS` to include your web app origin
+2. Or set `HAPI_PUBLIC_URL` which automatically adds to CORS
+3. Ensure the origin includes protocol (`https://`, not just domain)
+
+### SSL certificate errors
+
+1. Use publicly trusted certificates (Let's Encrypt recommended)
+2. For self-signed, set `NODE_EXTRA_CA_CERTS` on CLI machine
+3. Verify reverse proxy is correctly forwarding requests
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Telegram Setup" icon="paper-plane" href="/installation#telegram-setup">
+    Configure Telegram notifications (requires HTTPS)
+  </Card>
+
+  <Card title="Runner Setup" icon="play" href="/installation#runner-setup">
+    Enable remote session spawning
+  </Card>
+</CardGroup>

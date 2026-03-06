@@ -1,0 +1,264 @@
+---
+title: Cursor Agent
+description: Run Cursor Agent CLI sessions with HAPI remote control
+---
+
+## Overview
+
+HAPI supports [Cursor Agent CLI](https://cursor.com/docs/cli/using) for running Cursor's AI coding agent with remote control via web and phone.
+
+## Requirements
+
+### Install Cursor Agent CLI
+
+<CodeGroup>
+
+```bash macOS/Linux
+curl https://cursor.com/install -fsS | bash
+```
+
+```powershell Windows
+irm 'https://cursor.com/install?win32=true' | iex
+```
+
+</CodeGroup>
+
+### Verify Installation
+
+```bash
+agent --version
+```
+
+<Info>
+  Make sure the `agent` command is available on your PATH.
+</Info>
+
+## Starting a Session
+
+### Basic Usage
+
+```bash
+hapi cursor                    # Start new Cursor Agent session
+hapi cursor resume <chatId>    # Resume specific chat
+hapi cursor --continue         # Resume most recent chat
+```
+
+### With Options
+
+```bash
+hapi cursor --mode plan        # Start in Plan mode
+hapi cursor --mode ask         # Start in Ask mode
+hapi cursor --yolo             # Bypass approval prompts
+hapi cursor --model <model>    # Specify model
+hapi cursor --resume <chatId>  # Resume specific chat
+```
+
+## Available Flags
+
+| Flag | Description |
+|------|-------------|
+| `resume <chatId>` | Resume a specific chat by ID |
+| `--continue` | Resume the most recent chat |
+| `--resume <chatId>` | Alternative resume syntax |
+| `--mode <mode>` | Set permission mode: `plan` or `ask` |
+| `--plan` | Start in Plan mode (shortcut) |
+| `--yolo` | Bypass approval prompts (uses `--force`) |
+| `--force` | Explicit force flag |
+| `--model <model>` | Specify which model to use |
+| `--hapi-starting-mode` | Set initial mode: `local` or `remote` |
+
+<Info>
+  Additional Cursor Agent flags are passed through. See [Cursor CLI docs](https://cursor.com/docs/cli/using) for all options.
+</Info>
+
+## Permission Modes
+
+Cursor Agent supports these permission modes:
+
+<CardGroup cols={2}>
+  <Card title="Default" icon="shield-check">
+    Standard agent behavior with approval prompts
+  </Card>
+  <Card title="Plan Mode" icon="list-check">
+    Design approach before implementing changes
+  </Card>
+  <Card title="Ask Mode" icon="comment-question">
+    Explore code without making edits
+  </Card>
+  <Card title="Yolo" icon="triangle-exclamation">
+    Bypass all approval prompts (use with caution)
+  </Card>
+</CardGroup>
+
+Set mode via `--mode` flag or change from the web UI during a session.
+
+See `shared/src/modes.ts:13-14` for mode definitions.
+
+## Session Modes
+
+### Local Mode
+
+Full interactive experience from terminal:
+
+```bash
+hapi cursor
+```
+
+In local mode:
+- Direct terminal interaction with Cursor Agent
+- Real-time responses
+- Full feature set available
+- Messages from web/phone are queued
+
+### Remote Mode
+
+Control entirely from web/phone:
+
+```bash
+hapi cursor --hapi-starting-mode remote
+```
+
+In remote mode:
+- Uses `agent -p` with `--output-format stream-json`
+- Includes `--trust` flag for tool execution
+- Each message spawns one agent process
+- Session continues via `--resume`
+- No terminal interaction required
+
+<Warning>
+  In remote mode, `--trust` is used for tool execution. Tools run without per-request approval. Use `--yolo` for full bypass.
+</Warning>
+
+## Resume Functionality
+
+Cursor Agent has robust session resume capabilities:
+
+```bash
+# Resume by chat ID
+hapi cursor resume chat_abc123
+
+# Resume using flag syntax
+hapi cursor --resume chat_abc123
+
+# Resume most recent
+hapi cursor --continue
+```
+
+### Finding Chat IDs
+
+To list previous chats and get chat IDs:
+
+```bash
+agent ls
+```
+
+You can also view chat history in the HAPI web UI.
+
+## Examples
+
+### Start New Session
+
+```bash
+hapi cursor
+```
+
+### Start in Plan Mode
+
+```bash
+hapi cursor --mode plan
+```
+
+Plan mode designs the approach before coding.
+
+### Start in Ask Mode
+
+```bash
+hapi cursor --mode ask
+```
+
+Ask mode explores code without making edits.
+
+### Resume Specific Chat
+
+```bash
+hapi cursor resume chat_abc123
+```
+
+### Resume Most Recent
+
+```bash
+hapi cursor --continue
+```
+
+### Start with Yolo Mode
+
+```bash
+hapi cursor --yolo
+```
+
+<Warning>
+  Yolo mode bypasses all approval prompts. Use only in trusted environments.
+</Warning>
+
+### Specify Model
+
+```bash
+hapi cursor --model claude-4.5-sonnet
+```
+
+## Integration
+
+Once running, your Cursor Agent session appears in:
+- HAPI web app
+- Telegram Mini App
+
+You can:
+- Monitor session activity in real-time
+- Approve permissions from your phone
+- Send messages to the agent
+- Switch between local and remote modes
+- Change permission modes on the fly
+- View file changes and diffs
+
+## Limitations
+
+### Tool Approval in Remote Mode
+
+In remote mode, the `--trust` flag is used, which means tools run without per-request approval. This is required for remote operation but reduces granular control.
+
+**Workaround:** Use permission modes to control overall behavior:
+- `default` - Standard behavior
+- `plan` - Plan first, then implement
+- `ask` - Read-only exploration
+- `yolo` - Full bypass (use carefully)
+
+### Session Resume
+
+Cursor Agent sessions are chat-based. To resume:
+
+1. Get the chat ID from `agent ls` or the web UI
+2. Pass it to `--resume <chatId>` or `--continue`
+
+Each resumed session continues the same conversation context.
+
+## Related Commands
+
+```bash
+hapi auth status        # Check authentication
+hapi runner status      # View background service status
+hapi runner list        # List active HAPI sessions
+agent ls                # List Cursor chats
+hapi doctor             # Run diagnostics
+```
+
+## External Resources
+
+- [Cursor CLI Documentation](https://cursor.com/docs/cli/using)
+- [Cursor Agent Installation](https://cursor.com/install)
+
+## Source Reference
+
+- Command implementation: `cli/src/commands/cursor.ts`
+- Session runner: `cli/src/cursor/runCursor.ts`
+- Permission modes: `shared/src/modes.ts:13-14`
+- User guide: `docs/guide/cursor.md`

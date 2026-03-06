@@ -1,0 +1,380 @@
+---
+title: 'Session Commands'
+description: 'Start and manage AI agent sessions with HAPI'
+---
+
+## Overview
+
+HAPI CLI supports multiple AI coding agents, each with its own command and options. All session commands connect to the HAPI hub for remote control.
+
+## Claude Code Sessions
+
+### hapi (default command)
+
+Start a Claude Code session with remote control capabilities.
+
+```bash
+hapi [options]
+```
+
+<ParamField path="--yolo" type="flag">
+  Bypass all permissions (equivalent to `--dangerously-skip-permissions`)
+</ParamField>
+
+<ParamField path="--dangerously-skip-permissions" type="flag">
+  Skip all permission prompts (use with caution)
+</ParamField>
+
+<ParamField path="--model" type="string">
+  Specify the Claude model to use
+  
+  ```bash
+  hapi --model claude-sonnet-4.5
+  ```
+</ParamField>
+
+<ParamField path="--hapi-starting-mode" type="local | remote">
+  Set initial session mode:
+  - `local`: Controlled from terminal
+  - `remote`: Controlled from web/mobile app
+  
+  ```bash
+  hapi --hapi-starting-mode remote
+  ```
+</ParamField>
+
+<ParamField path="--resume" type="flag">
+  Resume the most recent Claude session
+  
+  ```bash
+  hapi --resume
+  ```
+</ParamField>
+
+### Pass-through to Claude
+
+All standard Claude CLI flags are supported and passed through:
+
+```bash
+# Examples from Claude CLI
+hapi --resume
+hapi --dangerously-skip-permissions
+hapi --model claude-sonnet-4.5
+```
+
+### Terminal Output Example
+
+```bash
+$ hapi
+✓ Connected to HAPI hub
+✓ Session registered: session-abc123
+✓ Claude Code started
+
+🌐 Control this session:
+   Web: https://your-hub.com/sessions/session-abc123
+   Telegram: /session session-abc123
+
+Claude Code is ready. How can I help you today?
+```
+
+---
+
+## Codex Sessions
+
+### hapi codex
+
+Start an OpenAI Codex session.
+
+```bash
+hapi codex [options]
+```
+
+<ParamField path="resume <sessionId>" type="string">
+  Resume an existing Codex session
+  
+  ```bash
+  hapi codex resume session-xyz789
+  ```
+</ParamField>
+
+<ParamField path="--yolo" type="flag">
+  Bypass approvals and sandbox restrictions (equivalent to `--dangerously-bypass-approvals-and-sandbox`)
+</ParamField>
+
+<ParamField path="--dangerously-bypass-approvals-and-sandbox" type="flag">
+  Skip all permission prompts and sandbox restrictions
+</ParamField>
+
+<ParamField path="--model" type="string">
+  Specify the OpenAI model to use
+  
+  ```bash
+  hapi codex --model gpt-4
+  ```
+</ParamField>
+
+### Examples
+
+```bash
+# Start new Codex session
+hapi codex
+
+# Resume specific session
+hapi codex resume session-xyz789
+
+# Start with bypass permissions
+hapi codex --yolo
+
+# Use specific model
+hapi codex --model gpt-4-turbo
+```
+
+---
+
+## Cursor Agent Sessions
+
+### hapi cursor
+
+Start a Cursor Agent session.
+
+```bash
+hapi cursor [options]
+```
+
+<ParamField path="resume <chatId>" type="string">
+  Resume an existing Cursor chat
+  
+  ```bash
+  hapi cursor resume chat-abc123
+  ```
+</ParamField>
+
+<ParamField path="--resume [chatId]" type="string" optional>
+  Resume a Cursor chat (chatId optional if used as flag)
+  
+  ```bash
+  hapi cursor --resume chat-abc123
+  ```
+</ParamField>
+
+<ParamField path="--continue" type="flag">
+  Continue the previous conversation
+</ParamField>
+
+<ParamField path="--mode" type="plan | ask">
+  Set the agent mode:
+  - `plan`: Planning mode (agent creates execution plan)
+  - `ask`: Question-answer mode
+  
+  ```bash
+  hapi cursor --mode plan
+  ```
+</ParamField>
+
+<ParamField path="--plan" type="flag">
+  Shortcut for `--mode plan`
+</ParamField>
+
+<ParamField path="--yolo" type="flag">
+  Bypass permissions (equivalent to `--force`)
+</ParamField>
+
+<ParamField path="--force" type="flag">
+  Force execution without prompts
+</ParamField>
+
+<ParamField path="--model" type="string">
+  Specify the model to use
+  
+  ```bash
+  hapi cursor --model claude-opus
+  ```
+</ParamField>
+
+<ParamField path="--hapi-starting-mode" type="local | remote">
+  Set initial session mode (local or remote control)
+</ParamField>
+
+### Examples
+
+```bash
+# Start new Cursor session
+hapi cursor
+
+# Resume specific chat
+hapi cursor resume chat-abc123
+
+# Start in planning mode
+hapi cursor --mode plan
+
+# Continue previous conversation
+hapi cursor --continue
+
+# Use specific model with bypass permissions
+hapi cursor --model claude-opus --yolo
+```
+
+### Terminal Output Example
+
+```bash
+$ hapi cursor --mode plan
+✓ Connected to HAPI hub
+✓ Cursor Agent started in plan mode
+✓ Session: session-cursor-456
+
+🌐 Control remotely at: https://your-hub.com/sessions/session-cursor-456
+```
+
+---
+
+## Gemini Sessions
+
+### hapi gemini
+
+Start a Google Gemini session via ACP (Anthropic Code Plugins).
+
+<Note>
+  Gemini runs in **remote mode only** - it waits for messages from the hub UI or Telegram.
+</Note>
+
+```bash
+hapi gemini [options]
+```
+
+<ParamField path="--yolo" type="flag">
+  Bypass permissions
+</ParamField>
+
+<ParamField path="--model" type="string">
+  Specify the Gemini model to use
+  
+  ```bash
+  hapi gemini --model gemini-pro
+  ```
+</ParamField>
+
+<ParamField path="--hapi-starting-mode" type="local | remote">
+  Set session mode (typically remote for Gemini)
+</ParamField>
+
+### Examples
+
+```bash
+# Start Gemini session (remote mode)
+hapi gemini
+
+# Start with specific model
+hapi gemini --model gemini-1.5-pro
+
+# Bypass permissions
+hapi gemini --yolo
+```
+
+---
+
+## OpenCode Sessions
+
+### hapi opencode
+
+Start an OpenCode session via ACP and plugin hooks.
+
+<Note>
+  OpenCode supports both local and remote modes. Local mode streams via OpenCode plugins.
+</Note>
+
+```bash
+hapi opencode [options]
+```
+
+<ParamField path="--resume <sessionId>" type="string">
+  Resume an existing OpenCode session
+  
+  ```bash
+  hapi opencode --resume session-opencode-123
+  ```
+</ParamField>
+
+<ParamField path="--yolo" type="flag">
+  Bypass permissions
+</ParamField>
+
+<ParamField path="--hapi-starting-mode" type="local | remote">
+  Set session mode:
+  - `local`: Terminal streaming via OpenCode plugins
+  - `remote`: Control from web/mobile
+</ParamField>
+
+### Examples
+
+```bash
+# Start OpenCode session
+hapi opencode
+
+# Resume existing session
+hapi opencode --resume session-opencode-123
+
+# Start in local mode
+hapi opencode --hapi-starting-mode local
+
+# Remote mode with bypass permissions
+hapi opencode --hapi-starting-mode remote --yolo
+```
+
+---
+
+## Common Flags
+
+These internal flags are used across multiple session types:
+
+<ParamField path="--started-by" type="runner | terminal">
+  Internal flag indicating how the session was started. Set automatically by the runner.
+</ParamField>
+
+## MCP Stdio Bridge
+
+### hapi mcp
+
+Start an MCP (Model Context Protocol) stdio bridge for external tools.
+
+```bash
+hapi mcp [arguments]
+```
+
+This command provides a bridge between MCP tools and HAPI sessions. Configuration can be set via the `HAPI_HTTP_MCP_URL` environment variable.
+
+### Example
+
+```bash
+# Start MCP bridge with default URL
+hapi mcp
+
+# With custom MCP URL (via env var)
+export HAPI_HTTP_MCP_URL=http://localhost:8080
+hapi mcp
+```
+
+---
+
+## Session Modes
+
+All session types support two control modes:
+
+### Local Mode
+- Session is controlled from the terminal
+- User interacts directly via command line
+- Still registered with hub for monitoring
+
+### Remote Mode
+- Session waits for commands from web/mobile app
+- No terminal interaction required
+- Ideal for background sessions
+
+### Switching Modes
+
+You can switch between local and remote modes mid-session using the web interface or Telegram bot.
+
+## Next Steps
+
+- [Authentication Commands](/cli/auth-commands) - Manage your CLI token
+- [Runner Commands](/cli/runner-commands) - Run sessions in the background
+- [Environment Variables](/cli/environment-variables) - Configure session behavior

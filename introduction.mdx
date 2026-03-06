@@ -1,0 +1,204 @@
+---
+title: Introduction
+description: A local-first platform for running AI coding agents with remote control
+---
+
+## What is HAPI?
+
+HAPI is a **local-first platform** that lets you run AI coding agents (Claude Code, Codex, Cursor Agent, Gemini, OpenCode) on your machine and control them remotely through web, PWA, and Telegram.
+
+<CardGroup cols={2}>
+  <Card title="Seamless Handoff" icon="arrows-left-right">
+    Work locally, switch to remote when needed, switch back anytime. No context loss, no session restart.
+  </Card>
+  <Card title="Native First" icon="terminal">
+    HAPI wraps your AI agent instead of replacing it. Same terminal, same experience, same muscle memory.
+  </Card>
+  <Card title="AFK Without Stopping" icon="mobile">
+    Step away from your desk? Approve AI requests from your phone with one tap.
+  </Card>
+  <Card title="Your AI, Your Choice" icon="brain">
+    Claude Code, Codex, Cursor Agent, Gemini, OpenCode—different models, one unified workflow.
+  </Card>
+</CardGroup>
+
+## Why HAPI?
+
+HAPI is a **local-first alternative** to Happy. While Happy uses a centralized server that stores your encrypted data, HAPI is decentralized—each user runs their own hub, and data never leaves your machine.
+
+| Aspect | Happy | HAPI |
+|--------|-------|------|
+| **Architecture** | Centralized (cloud server stores encrypted data) | Decentralized (each user runs own hub) |
+| **Data** | Encrypted on server (server cannot read) | Stays on your machine |
+| **Deployment** | Multiple services (PostgreSQL, Redis, app server) | Single binary |
+| **Complexity** | High (E2EE, key management, scaling) | Low (one command) |
+
+<Note>
+  **Choose HAPI if**: You want data sovereignty, self-hosting, and minimal setup.
+  
+  **Choose Happy if**: You need a managed cloud service with multi-user collaboration.
+</Note>
+
+## How It Works
+
+HAPI consists of three components that work together:
+
+<Steps>
+  <Step title="HAPI Hub">
+    Central coordinator that handles persistence, real-time sync, and remote access. Runs on your machine with a single command.
+    
+    ```bash
+    hapi hub --relay
+    ```
+  </Step>
+  
+  <Step title="HAPI CLI">
+    Wraps AI agents (Claude Code, Codex, Cursor, Gemini, OpenCode) and connects them to the hub via Socket.IO.
+    
+    ```bash
+    hapi              # Start Claude Code
+    hapi codex        # Start Codex
+    hapi cursor       # Start Cursor Agent
+    hapi gemini       # Start Gemini
+    hapi opencode     # Start OpenCode
+    ```
+  </Step>
+  
+  <Step title="Web App">
+    React PWA that provides the mobile interface—view sessions, send messages, approve permissions, browse files.
+  </Step>
+</Steps>
+
+### Architecture Overview
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│                     Your Machine                               │
+│                                                                │
+│  ┌──────────┐    Socket.IO    ┌──────────┐    SSE            │
+│  │   CLI    │◄───────────────►│   Hub    │◄────────►┌────────┤
+│  │+ Agent   │                 │ + SQLite │          │Web App │
+│  └──────────┘                 └──────────┘          └────────┘│
+└────────────────────────────────┬───────────────────────────────┘
+                                 │
+                        [Tunnel / Public URL]
+                                 │
+                           ┌─────▼─────┐
+                           │ Phone/Web │
+                           └───────────┘
+```
+
+## Key Features
+
+### Terminal Anywhere
+
+Run commands from your phone or browser, directly connected to the working machine.
+
+### Voice Control
+
+Talk to your AI agent hands-free using the built-in voice assistant powered by ElevenLabs.
+
+### Multi-Agent Support
+
+```bash
+# Claude Code (recommended)
+hapi
+
+# OpenAI Codex
+hapi codex
+
+# Cursor Agent
+hapi cursor
+
+# Google Gemini
+hapi gemini
+
+# OpenCode
+hapi opencode
+```
+
+### Remote Session Spawning
+
+With the runner, spawn new sessions from your phone:
+
+```bash
+hapi runner start
+```
+
+Your machine appears in the "Machines" list—tap to start sessions remotely.
+
+## Security Model
+
+HAPI offers two modes of remote access:
+
+<CardGroup cols={2}>
+  <Card title="Public Relay" icon="shield-halved">
+    **End-to-end encrypted** with WireGuard + TLS via `tunwg`. The relay only forwards encrypted packets it cannot read.
+    
+    ```bash
+    hapi hub --relay
+    ```
+  </Card>
+  
+  <Card title="Self-Hosted" icon="server">
+    Run on your own server, Cloudflare Tunnel, or Tailscale. You control the full network path—no E2EE needed.
+    
+    ```bash
+    hapi hub
+    ```
+  </Card>
+</CardGroup>
+
+<Warning>
+  Your data stays on your machine. HAPI is **local-first**—nothing is uploaded to external servers.
+</Warning>
+
+## Supported AI Agents
+
+| Agent | Command | Requirements |
+|-------|---------|-------------|
+| **Claude Code** | `hapi` | Claude CLI installed (`claude` on PATH) |
+| **OpenAI Codex** | `hapi codex` | Codex CLI installed |
+| **Cursor Agent** | `hapi cursor` | Cursor Agent CLI installed (`agent` on PATH) |
+| **Google Gemini** | `hapi gemini` | Gemini CLI installed (via ACP) |
+| **OpenCode** | `hapi opencode` | OpenCode CLI installed (`opencode` on PATH) |
+
+## Quick Example
+
+Get started in under 2 minutes:
+
+<CodeGroup>
+```bash Terminal 1: Start Hub
+hapi hub --relay
+# Displays URL and QR code
+```
+
+```bash Terminal 2: Start Session
+hapi
+# Claude Code session starts
+```
+
+```bash Terminal 3: Background Runner (Optional)
+hapi runner start
+# Enables remote session spawning
+```
+</CodeGroup>
+
+Scan the QR code or open the URL on your phone. Your session appears instantly.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get HAPI running in under 2 minutes
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Complete setup guide with all installation options
+  </Card>
+  <Card title="How It Works" icon="book" href="/concepts/how-it-works">
+    Deep dive into architecture and data flow
+  </Card>
+  <Card title="GitHub" icon="github" href="https://github.com/tiann/hapi">
+    View source code and contribute
+  </Card>
+</CardGroup>

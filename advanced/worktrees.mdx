@@ -1,0 +1,449 @@
+---
+title: Worktrees
+description: Git worktree support for parallel branch development
+---
+
+HAPI supports Git worktrees for spawning sessions in isolated branch environments. This enables parallel development on multiple branches without switching contexts or managing multiple repository clones.
+
+## What Are Worktrees?
+
+Git worktrees allow you to check out multiple branches from a single repository simultaneously. Each worktree has its own working directory, enabling parallel work without context switching.
+
+<CardGroup cols={2}>
+  <Card title="Parallel Development" icon="code-branch">
+    Work on multiple features or bug fixes simultaneously without switching branches
+  </Card>
+  <Card title="Clean Isolation" icon="shield">
+    Each session gets a pristine branch with no uncommitted changes from other work
+  </Card>
+</CardGroup>
+
+## How HAPI Uses Worktrees
+
+When you spawn a session with `sessionType: 'worktree'`, the HAPI runner:
+
+<Steps>
+  <Step title="Create Branch">
+    Creates a new branch named `hapi-<name>` (e.g., `hapi-0106-a3f2`)
+  </Step>
+  <Step title="Create Worktree">
+    Creates a worktree directory at `<repo-name>-worktrees/<name>`
+  </Step>
+  <Step title="Spawn Session">
+    Starts the AI coding session in the worktree directory
+  </Step>
+  <Step title="Set Environment">
+    Injects worktree metadata as environment variables
+  </Step>
+</Steps>
+
+## Worktree Environment Variables
+
+When a session runs in a worktree, the runner sets these environment variables:
+
+### HAPI_WORKTREE_BASE_PATH
+
+The root directory of the base repository:
+
+```bash
+HAPI_WORKTREE_BASE_PATH=/Users/you/projects/my-repo
+```
+
+### HAPI_WORKTREE_BRANCH
+
+The branch name created for this worktree:
+
+```bash
+HAPI_WORKTREE_BRANCH=hapi-0106-a3f2
+```
+
+### HAPI_WORKTREE_NAME
+
+The worktree name (also the directory name):
+
+```bash
+HAPI_WORKTREE_NAME=0106-a3f2
+```
+
+### HAPI_WORKTREE_PATH
+
+The full path to the worktree directory:
+
+```bash
+HAPI_WORKTREE_PATH=/Users/you/projects/my-repo-worktrees/0106-a3f2
+```
+
+### HAPI_WORKTREE_CREATED_AT
+
+Worktree creation timestamp in milliseconds:
+
+```bash
+HAPI_WORKTREE_CREATED_AT=1703001234567
+```
+
+## Worktree Directory Structure
+
+Worktrees are created in a sibling directory to your repository:
+
+```
+projects/
+├── my-repo/                      # Base repository
+│   ├── .git/
+│   ├── src/
+│   └── ...
+└── my-repo-worktrees/            # Worktrees directory
+    ├── 0106-a3f2/                # First worktree
+    │   ├── .git -> ../my-repo/.git/worktrees/0106-a3f2
+    │   ├── src/
+    │   └── ...
+    └── feature-auth/             # Named worktree
+        ├── .git -> ../my-repo/.git/worktrees/feature-auth
+        ├── src/
+        └── ...
+```
+
+## Creating Worktree Sessions
+
+### Via Web/Mobile App
+
+When spawning a session through the web interface or Telegram Mini App:
+
+1. Select "Git Worktree" as the session type
+2. Choose your repository base directory
+3. Optionally provide a worktree name (e.g., "feature-auth")
+4. The runner creates the worktree and spawns the session
+
+### Via Runner RPC
+
+Programmatically spawn worktree sessions:
+
+```typescript
+const result = await spawnSession({
+  directory: '/Users/you/projects/my-repo',
+  sessionType: 'worktree',
+  worktreeName: 'feature-auth',  // Optional
+  agent: 'claude',
+  machineId: 'machine-uuid-123'
+});
+
+if (result.type === 'success') {
+  console.log('Session ID:', result.sessionId);
+  console.log('Worktree path:', result.worktreePath);
+}
+```
+
+## Worktree Naming
+
+Worktree names follow a specific pattern:
+
+<AccordionGroup>
+  <Accordion title="Default Naming (No Hint)">
+    If you don't provide a `worktreeName`, HAPI generates a name with the format `MMDD-XXXX`:
+    
+    - `MM`: Month (01-12)
+    - `DD`: Day (01-31)
+    - `XXXX`: Random hex suffix (4 characters)
+    
+    **Example:** `0106-a3f2` (January 6th with random suffix)
+  </Accordion>
+
+  <Accordion title="Named Worktrees (With Hint)">
+    If you provide a `worktreeName`, it's converted to a URL-safe slug:
+    
+    - Lowercase conversion
+    - Replace non-alphanumeric with hyphens
+    - Strip leading/trailing hyphens
+    
+    **Examples:**
+    - `"Feature Auth"` → `feature-auth`
+    - `"fix/bug-123"` → `fix-bug-123`
+    - `"My New Feature"` → `my-new-feature`
+  </Accordion>
+
+  <Accordion title="Collision Handling">
+    If a worktree name or branch already exists, HAPI appends a random hex suffix:
+    
+    - First attempt: `feature-auth`
+    - Second attempt: `feature-auth-7b9e`
+    - Third attempt: `feature-auth-d4c1`
+    
+    Maximum attempts: 5 (then fails with error)
+  </Accordion>
+</AccordionGroup>
+
+## Branch Naming
+
+Worktree branches are prefixed with `hapi-` to distinguish them from regular branches:
+
+```bash
+# Worktree name: feature-auth
+# Branch name: hapi-feature-auth
+
+# Worktree name: 0106-a3f2
+# Branch name: hapi-0106-a3f2
+```
+
+View worktree branches:
+```bash
+git branch | grep hapi-
+```
+
+## Worktree Cleanup
+
+The runner automatically cleans up worktrees when sessions end:
+
+<Steps>
+  <Step title="Session Exit">
+    The session process exits normally or is terminated
+  </Step>
+  <Step title="Runner Detects Exit">
+    Runner's `onChildExited` handler is called
+  </Step>
+  <Step title="Process Check">
+    Runner verifies the process is no longer alive
+  </Step>
+  <Step title="Remove Worktree">
+    Runner executes `git worktree remove --force <path>`
+  </Step>
+</Steps>
+
+<Warning>
+If the session process is still alive when cleanup is triggered, the runner skips worktree removal to prevent data loss. The worktree will remain until manually cleaned.
+</Warning>
+
+### Manual Cleanup
+
+To manually remove a worktree:
+
+```bash
+# List all worktrees
+git worktree list
+
+# Remove specific worktree
+git worktree remove /path/to/repo-worktrees/feature-auth
+
+# Remove worktree and delete branch
+git worktree remove /path/to/repo-worktrees/feature-auth
+git branch -D hapi-feature-auth
+```
+
+### Cleanup on Errors
+
+Worktrees are cleaned up in error scenarios:
+
+- Spawn fails (no PID returned)
+- Session webhook timeout
+- Directory creation error
+- Exception during spawn
+
+If the session process is still running, cleanup is skipped to preserve data.
+
+## Worktree Detection
+
+HAPI can automatically detect if a session is running in a worktree:
+
+<CodeGroup>
+```typescript Environment Variables (Priority 1)
+// Runner sets these when spawning worktree sessions
+const worktreeInfo = {
+  basePath: process.env.HAPI_WORKTREE_BASE_PATH,
+  branch: process.env.HAPI_WORKTREE_BRANCH,
+  name: process.env.HAPI_WORKTREE_NAME,
+  worktreePath: process.env.HAPI_WORKTREE_PATH,
+  createdAt: parseInt(process.env.HAPI_WORKTREE_CREATED_AT)
+};
+```
+
+```typescript Git Commands (Fallback)
+// If env vars not present, probe with git commands
+const gitDir = execSync('git rev-parse --git-dir').toString().trim();
+const gitCommonDir = execSync('git rev-parse --git-common-dir').toString().trim();
+
+if (gitDir !== gitCommonDir) {
+  // This is a worktree!
+  const worktreeRoot = execSync('git rev-parse --show-toplevel').toString().trim();
+  const branch = execSync('git symbolic-ref --short HEAD').toString().trim();
+  // ...
+}
+```
+</CodeGroup>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Feature Development" icon="sparkles">
+    Work on multiple features in parallel without branch switching
+  </Card>
+  <Card title="Bug Fixes" icon="bug">
+    Isolate bug fix work while keeping feature development active
+  </Card>
+  <Card title="Code Review" icon="code-compare">
+    Check out a PR branch in a worktree for side-by-side comparison
+  </Card>
+  <Card title="Experimentation" icon="flask">
+    Test risky changes in an isolated worktree without affecting main work
+  </Card>
+</CardGroup>
+
+## Worktree Metadata in Sessions
+
+HAPI sessions track worktree information in session metadata:
+
+```typescript
+interface SessionMetadata {
+  // ... other metadata
+  worktreeInfo?: {
+    basePath: string;      // Base repo path
+    branch: string;        // hapi-<name>
+    name: string;          // Worktree name
+    worktreePath: string;  // Full worktree path
+    createdAt: number;     // Timestamp (ms)
+  }
+}
+```
+
+This metadata is:
+- Stored in the hub database
+- Visible in the web interface
+- Included in session exports
+- Used for session restoration
+
+## Limitations
+
+<Warning>
+**Repository Requirements:**
+- Base directory must be a valid Git repository
+- Repository must not be in a detached HEAD state
+- Must have at least one commit
+
+**Worktree Restrictions:**
+- Cannot create worktrees from worktrees (must use base repo)
+- Branch names must be unique across all worktrees
+- Worktree paths must not already exist
+</Warning>
+
+### Error Handling
+
+Common errors and solutions:
+
+<AccordionGroup>
+  <Accordion title="'Path is not a Git repository'">
+    **Cause:** Base directory is not a git repo
+    
+    **Solution:** Initialize git or provide correct repository path:
+    ```bash
+    git init
+    git commit --allow-empty -m "Initial commit"
+    ```
+  </Accordion>
+
+  <Accordion title="'Failed to create worktree: fatal: 'hapi-name' already exists'">
+    **Cause:** Branch name collision
+    
+    **Solution:** Use a different worktree name or delete the existing branch:
+    ```bash
+    git branch -D hapi-name
+    ```
+  </Accordion>
+
+  <Accordion title="'Failed to create worktree after multiple attempts'">
+    **Cause:** Random name collisions (rare)
+    
+    **Solution:** Try again or manually specify a unique worktree name
+  </Accordion>
+
+  <Accordion title="'Worktree base directory missing'">
+    **Cause:** Base path doesn't exist
+    
+    **Solution:** Verify the repository path exists and is accessible
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Descriptive Names" icon="tag">
+    Provide meaningful worktree names for easy identification: `feature-auth`, `bugfix-123`, `refactor-api`
+  </Card>
+  <Card title="Clean Up Regularly" icon="broom">
+    Remove unused worktrees to save disk space and avoid clutter
+  </Card>
+  <Card title="Merge Frequently" icon="code-merge">
+    Merge worktree branches back to main regularly to avoid long-lived branches
+  </Card>
+  <Card title="Monitor Disk Usage" icon="hard-drive">
+    Each worktree duplicates your working directory. Large repos consume significant space.
+  </Card>
+</CardGroup>
+
+## Advanced: Worktree Persistence
+
+Worktrees persist after the runner stops or restarts:
+
+- **Runner restart:** Sessions continue running in worktrees
+- **Machine reboot:** Worktrees remain on disk but sessions are lost
+- **Orphaned worktrees:** Use `git worktree list` and `git worktree prune` to clean up
+
+```bash
+# List all worktrees (including orphaned)
+git worktree list
+
+# Remove orphaned worktree metadata
+git worktree prune
+
+# Force remove worktree even if not clean
+git worktree remove --force /path/to/worktree
+```
+
+## Troubleshooting
+
+### Session Not Detecting Worktree
+
+1. Check environment variables:
+   ```bash
+   echo $HAPI_WORKTREE_PATH
+   ```
+
+2. Verify git worktree:
+   ```bash
+   git rev-parse --git-dir
+   git rev-parse --git-common-dir
+   ```
+
+3. Check runner logs:
+   ```bash
+   tail -f $(hapi runner logs) | grep WORKTREE
+   ```
+
+### Worktree Not Cleaned Up
+
+If a worktree remains after session exit:
+
+1. Check if process is still alive:
+   ```bash
+   ps aux | grep hapi
+   ```
+
+2. Manually remove worktree:
+   ```bash
+   git worktree remove --force /path/to/worktree
+   ```
+
+3. Check runner logs for cleanup failures:
+   ```bash
+   tail -f $(hapi runner logs) | grep "Failed to remove worktree"
+   ```
+
+## Related Topics
+
+<CardGroup cols={3}>
+  <Card title="Runner" href="/advanced/runner" icon="rocket">
+    Background daemon that manages worktree sessions
+  </Card>
+  <Card title="Configuration" href="/advanced/configuration" icon="gear">
+    Environment variables and settings
+  </Card>
+  <Card title="Sessions" href="/concepts/sessions" icon="terminal">
+    Managing AI coding sessions
+  </Card>
+</CardGroup>

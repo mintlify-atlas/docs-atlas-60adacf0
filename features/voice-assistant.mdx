@@ -1,0 +1,331 @@
+---
+title: Voice Assistant
+description: Control your AI coding agent with voice using ElevenLabs
+---
+
+Control your AI coding agent with voice using the built-in voice assistant powered by ElevenLabs Conversational AI.
+
+## Overview
+
+The voice assistant lets you:
+
+<CardGroup cols={3}>
+  <Card title="Talk to Your Agent" icon="microphone">
+    Ask questions, give instructions, and request code changes hands-free
+  </Card>
+  <Card title="Approve by Voice" icon="check">
+    Say "yes" or "no" to approve or deny permission requests
+  </Card>
+  <Card title="Monitor Progress" icon="ear-listen">
+    Receive spoken updates when tasks complete or errors occur
+  </Card>
+</CardGroup>
+
+The assistant bridges voice communication with your active coding agent (Claude Code, Codex, Gemini, or OpenCode), relaying your requests and summarizing responses in natural speech.
+
+## Prerequisites
+
+You need an [ElevenLabs](https://elevenlabs.io) account with API access.
+
+<Note>
+ElevenLabs offers a free tier with limited usage. Paid plans provide more minutes and better voice quality.
+</Note>
+
+## Setup
+
+### 1. Get an API Key
+
+<Steps>
+  <Step title="Sign Up">
+    Sign up or log in at [elevenlabs.io](https://elevenlabs.io)
+  </Step>
+  <Step title="API Keys">
+    Go to [API Keys](https://elevenlabs.io/app/settings/api-keys) in your account settings
+  </Step>
+  <Step title="Create Key">
+    Create a new API key and copy it
+  </Step>
+</Steps>
+
+### 2. Configure the Hub
+
+Set the environment variable before starting the hub:
+
+```bash
+export ELEVENLABS_API_KEY="your-api-key"
+hapi hub --relay
+```
+
+The hub automatically creates a "Hapi Voice Assistant" agent in your ElevenLabs account on first use.
+
+<Tip>
+The `--relay` flag is optional but recommended for better connectivity.
+</Tip>
+
+### 3. (Optional) Use Custom Agent
+
+If you want to use your own ElevenLabs agent instead of the auto-created one:
+
+```bash
+export ELEVENLABS_AGENT_ID="your-agent-id"
+```
+
+You can find agent IDs in your ElevenLabs dashboard under Conversational AI agents.
+
+## Configuration
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ELEVENLABS_API_KEY` | Yes | ElevenLabs API key for voice assistant |
+| `ELEVENLABS_AGENT_ID` | No | Custom agent ID (auto-created if not set) |
+
+## Usage
+
+### Starting a Voice Session
+
+<Steps>
+  <Step title="Open Session">
+    Open a session in the HAPI web app
+  </Step>
+  <Step title="Microphone Button">
+    Click the **microphone button** in the composer (or the send button when empty)
+  </Step>
+  <Step title="Grant Permission">
+    Grant microphone permission when prompted by your browser
+  </Step>
+  <Step title="Start Speaking">
+    Start speaking — the assistant is listening
+  </Step>
+</Steps>
+
+<Note>
+Voice assistant is only available in the web app, not in Telegram Mini App or terminal.
+</Note>
+
+### Voice Commands
+
+The assistant understands natural language. Here are common patterns:
+
+| Say This | What Happens |
+|----------|-------------|
+| "Ask Claude to..." / "Have it..." | Sends your request to the coding agent |
+| "Refactor the auth module" | Coding requests are forwarded automatically |
+| "Yes" / "Allow" / "Go ahead" | Approves pending permission requests |
+| "No" / "Deny" / "Cancel" | Denies pending permission requests |
+| Direct questions | The voice assistant answers itself if it can |
+
+<Tip>
+You don't need special command syntax — just speak naturally.
+</Tip>
+
+## How It Works
+
+### Context Synchronization
+
+The voice assistant automatically receives updates when:
+
+- You focus on a session (full history is loaded)
+- The agent sends messages or uses tools
+- Permission requests arrive
+- Tasks complete
+
+You don't need to ask for status updates — the assistant proactively summarizes relevant changes.
+
+### Tools
+
+The voice assistant has two tools to interact with your coding agent:
+
+<CardGroup cols={2}>
+  <Card title="messageCodingAgent" icon="message">
+    Forwards your requests to the active agent
+  </Card>
+  <Card title="processPermissionRequest" icon="shield-check">
+    Handles permission approvals and denials
+  </Card>
+</CardGroup>
+
+### Architecture
+
+```
+Browser → WebRTC → ElevenLabs ConvAI → Voice Assistant → HAPI Hub → Coding Agent
+```
+
+- **Browser** captures audio via WebRTC
+- **ElevenLabs** handles speech-to-text and text-to-speech
+- **Voice Assistant** interprets intent and calls tools
+- **HAPI Hub** routes tool calls to the coding agent
+- **Coding Agent** executes the request
+
+<Note>
+The voice connection uses WebRTC for low-latency audio streaming. The HAPI hub provides conversation tokens and handles authentication.
+</Note>
+
+## Use Cases
+
+### Hands-Free Coding
+
+Code while your hands are busy:
+
+```
+You: "Ask Claude to refactor the authentication module"
+Assistant: "I'll relay that to Claude."
+*Claude processes*
+Assistant: "Claude has refactored the auth module and is
+           requesting permission to edit 3 files."
+You: "Yes, allow it."
+Assistant: "Permission approved. Claude is writing the changes."
+```
+
+### Quick Permission Approvals
+
+Approve permissions while away from keyboard:
+
+```
+Assistant: "Claude is requesting permission to run npm install."
+You: "Yes."
+Assistant: "Permission approved."
+```
+
+### Progress Monitoring
+
+Get spoken updates without looking at screen:
+
+```
+Assistant: "Claude has completed the refactoring.
+           All tests are passing. Ready for your next instruction."
+```
+
+## Tips for Best Results
+
+<AccordionGroup>
+  <Accordion title="Be Specific">
+    Clear, complete requests get better results:
+    - ✅ "Refactor the user authentication module to use JWT tokens"
+    - ❌ "Fix that thing"
+  </Accordion>
+
+  <Accordion title="Wait for Completion">
+    The assistant stays silent while the agent works, then summarizes results. Don't interrupt while processing.
+  </Accordion>
+
+  <Accordion title="Use Natural Language">
+    No special command syntax needed:
+    - ✅ "Can you have Claude add error handling to the API?"
+    - ✅ "Tell it to fix the bug in utils.ts"
+    - ✅ "Yes, go ahead"
+  </Accordion>
+
+  <Accordion title="Keep Sessions Focused">
+    Use one active session at a time for clearest context. The assistant tracks the currently focused session.
+  </Accordion>
+</AccordionGroup>
+
+## Audio Quality
+
+For best audio experience:
+
+- **Use a headset** to avoid echo
+- **Reduce background noise** for better recognition
+- **Stable internet** for low-latency streaming
+- **Chrome/Edge** recommended (best WebRTC support)
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title='"ElevenLabs API key not configured"'>
+    **Solution**: Set `ELEVENLABS_API_KEY` in your environment and restart the hub:
+    ```bash
+    export ELEVENLABS_API_KEY="your-api-key"
+    hapi hub
+    ```
+  </Accordion>
+
+  <Accordion title='"Failed to get microphone permission"'>
+    **Possible causes**:
+    - Check browser permissions for microphone access
+    - Ensure no other app is using the microphone
+    - Try refreshing the page
+    - HTTPS required (some browsers block mic on HTTP)
+  </Accordion>
+
+  <Accordion title="Voice Not Responding">
+    **Check these**:
+    - Verify the session is connected (green dot in status bar)
+    - Check that voice status shows "connecting" or connected state
+    - Ensure you have a stable internet connection
+    - Look for errors in browser console (F12)
+  </Accordion>
+
+  <Accordion title='"Failed to create ElevenLabs agent automatically"'>
+    **Solutions**:
+    - Verify your API key is valid
+    - Check your ElevenLabs account has available quota
+    - Try setting a custom `ELEVENLABS_AGENT_ID` from your dashboard
+  </Accordion>
+
+  <Accordion title="Poor Audio Quality">
+    **Improvements**:
+    - Use a headset to avoid echo
+    - Reduce background noise
+    - Check your internet connection stability
+    - Upgrade to a paid ElevenLabs plan for better voice quality
+  </Accordion>
+
+  <Accordion title="Assistant Misunderstands Commands">
+    **Tips**:
+    - Speak clearly and at moderate pace
+    - Use complete sentences
+    - Be explicit: "Ask Claude to..." vs just describing the task
+    - Check that session has an active agent
+  </Accordion>
+</AccordionGroup>
+
+## Limitations
+
+<Warning>
+Voice assistant has some limitations:
+
+- **Session focus**: Only works with the currently focused session
+- **Browser support**: Requires WebRTC (Chrome/Edge recommended)
+- **Network**: Requires stable internet for real-time streaming
+- **Cost**: Uses ElevenLabs API quota
+</Warning>
+
+## Browser Support
+
+| Browser | Platform | Support |
+|---------|----------|----------|
+| Chrome | Desktop/Android | ✅ Full support |
+| Edge | Desktop/Android | ✅ Full support |
+| Safari | macOS/iOS | ⚠️ Limited WebRTC support |
+| Firefox | All | ⚠️ Partial support |
+
+## Privacy & Security
+
+### Audio Processing
+
+- Audio is streamed to ElevenLabs via WebRTC
+- ElevenLabs processes speech-to-text
+- Transcripts are sent to the voice assistant
+- Voice responses are generated by ElevenLabs
+
+### Data Handling
+
+- Audio is not stored by HAPI
+- Transcripts are logged for debugging (can be disabled)
+- ElevenLabs has its own data retention policies
+- Check [ElevenLabs Privacy Policy](https://elevenlabs.io/privacy) for details
+
+## Related Features
+
+<CardGroup cols={3}>
+  <Card title="Remote Control" href="/features/remote-control" icon="mobile">
+    Control sessions from anywhere
+  </Card>
+  <Card title="Permissions" href="/features/permissions" icon="shield-check">
+    Approve agent actions
+  </Card>
+  <Card title="PWA" href="/features/pwa" icon="mobile-screen">
+    Install HAPI on your phone
+  </Card>
+</CardGroup>

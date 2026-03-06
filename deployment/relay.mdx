@@ -1,0 +1,165 @@
+---
+title: Deploy with Relay
+description: Use HAPI's public relay with end-to-end encryption for zero-configuration remote access
+---
+
+The relay deployment mode provides the easiest way to access your HAPI hub remotely. It uses WireGuard + TLS for end-to-end encryption, requires no public IP or port forwarding, and works behind NAT and firewalls.
+
+## How it works
+
+When you start the hub with `--relay`:
+
+1. The hub establishes an encrypted tunnel to `relay.hapi.run` (configurable via `HAPI_RELAY_API`)
+2. Your device connects through the same relay using WireGuard + TLS
+3. All traffic is end-to-end encrypted — the relay server only forwards opaque packets
+4. The relay cannot read, store, or access your data
+
+```
+Your Device ──[WireGuard+TLS]──> Relay Server ──[WireGuard+TLS]──> Your Hub
+                                  (forwards only)
+```
+
+<Note>
+  The relay uses UDP by default for optimal performance. If you experience connectivity issues (some networks block UDP), set `HAPI_RELAY_FORCE_TCP=true` to force TCP mode.
+</Note>
+
+## Quick start
+
+<Steps>
+  <Step title="Start hub with relay">
+    ```bash
+    hapi hub --relay
+    ```
+
+    The terminal displays a URL and QR code for remote access.
+
+    <Note>
+      `hapi server --relay` is supported as an alias.
+    </Note>
+  </Step>
+
+  <Step title="Access from anywhere">
+    Scan the QR code with your phone or open the URL in a browser. The access token is included in the URL.
+  </Step>
+
+  <Step title="Run a session">
+    ```bash
+    hapi
+    ```
+
+    Your session is now accessible from the web app or Telegram Mini App.
+  </Step>
+</Steps>
+
+## Configuration
+
+### Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `HAPI_RELAY_API` | `relay.hapi.run` | Relay server domain |
+| `HAPI_RELAY_AUTH` | `hapi` | Relay authentication key |
+| `HAPI_RELAY_FORCE_TCP` | `false` | Force TCP mode (set to `true` or `1`) |
+
+### Example: Force TCP mode
+
+```bash
+export HAPI_RELAY_FORCE_TCP=true
+hapi hub --relay
+```
+
+### Example: Custom relay server
+
+```bash
+export HAPI_RELAY_API=relay.yourcompany.com
+export HAPI_RELAY_AUTH=your-auth-key
+hapi hub --relay
+```
+
+## Security benefits
+
+<CardGroup cols={2}>
+  <Card title="End-to-end encryption" icon="lock">
+    WireGuard + TLS protects all data from your device to your machine. The relay server cannot decrypt your traffic.
+  </Card>
+
+  <Card title="No stored data" icon="shield">
+    The relay only forwards encrypted packets. Nothing is logged or persisted on the relay server.
+  </Card>
+
+  <Card title="Works everywhere" icon="globe">
+    No public IP, port forwarding, or firewall configuration required. Works behind corporate networks and mobile connections.
+  </Card>
+
+  <Card title="Zero configuration" icon="bolt">
+    One command to start. No DNS setup, no certificates, no tunnel configuration.
+  </Card>
+</CardGroup>
+
+## When to use relay
+
+Relay mode is ideal when:
+
+- You want instant remote access without configuration
+- You're behind NAT, firewalls, or restrictive networks
+- You don't have a public IP or VPS
+- You want end-to-end encryption without managing certificates
+- You're working from different networks (home, office, mobile)
+
+<Warning>
+  While the relay server cannot read your data, all traffic passes through a third-party server. For maximum control, consider [self-hosted](/deployment/self-hosted), [Cloudflare Tunnel](/deployment/cloudflare-tunnel), or [Tailscale](/deployment/tailscale) deployment.
+</Warning>
+
+## Troubleshooting
+
+### Connection issues
+
+If you experience connectivity problems:
+
+1. **Try TCP mode**: Some networks block UDP traffic
+   ```bash
+   export HAPI_RELAY_FORCE_TCP=true
+   hapi hub --relay
+   ```
+
+2. **Check firewall**: Ensure outbound connections to `relay.hapi.run` are allowed
+
+3. **Test from another network**: Try mobile data or a different WiFi network
+
+### Access token not working
+
+The access token is automatically included in the QR code URL. If you need to enter it manually:
+
+1. The token is displayed when the hub starts
+2. It's also saved in `~/.hapi/settings.json` as `cliApiToken`
+
+## Background service
+
+To keep the relay running persistently:
+
+```bash
+# Using nohup
+nohup hapi hub --relay > ~/.hapi/logs/hub.log 2>&1 &
+
+# Using pm2
+pm2 start "hapi hub --relay" --name hapi-hub
+pm2 save
+
+# Using systemd (Linux)
+systemctl --user enable hapi-hub
+systemctl --user start hapi-hub
+```
+
+See [Installation Guide](/installation#background-service-deployment) for complete examples.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Runner Setup" icon="play" href="/installation#runner-setup">
+    Enable remote session spawning with the background runner
+  </Card>
+
+  <Card title="Telegram Setup" icon="paper-plane" href="/installation#telegram-setup">
+    Configure Telegram notifications and Mini App access
+  </Card>
+</CardGroup>

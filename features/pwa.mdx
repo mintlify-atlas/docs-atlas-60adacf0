@@ -1,0 +1,321 @@
+---
+title: Progressive Web App
+description: Install HAPI on your phone for a native app-like experience
+---
+
+HAPI's web interface is a fully-featured PWA that can be installed on your phone for a native app-like experience.
+
+## What is a PWA?
+
+A Progressive Web App (PWA) is a web application that can be installed on your device and works like a native app:
+
+<CardGroup cols={2}>
+  <Card title="Home Screen Icon" icon="mobile">
+    Launch HAPI like any other app from your home screen
+  </Card>
+  <Card title="Full Screen Mode" icon="expand">
+    No browser chrome, immersive experience
+  </Card>
+  <Card title="Offline Support" icon="wifi-slash">
+    Basic functionality works without internet
+  </Card>
+  <Card title="Auto-Updates" icon="arrows-rotate">
+    Always get the latest version automatically
+  </Card>
+</CardGroup>
+
+## Installing HAPI PWA
+
+### Android (Chrome/Edge)
+
+<Steps>
+  <Step title="Open HAPI">
+    Navigate to HAPI in Chrome or Edge browser
+  </Step>
+  <Step title="Install Prompt">
+    Look for the **"Install HAPI"** banner at the bottom
+  </Step>
+  <Step title="Tap Install">
+    Tap **"Install"** and HAPI appears on your home screen
+  </Step>
+</Steps>
+
+<Tip>
+If you don't see the install banner, tap the three-dot menu and select **"Add to Home screen"** or **"Install app"**.
+</Tip>
+
+### iOS (Safari)
+
+<Steps>
+  <Step title="Open in Safari">
+    Open HAPI in Safari browser (required for iOS)
+  </Step>
+  <Step title="Share Button">
+    Tap the **Share** button (square with arrow)
+  </Step>
+  <Step title="Add to Home Screen">
+    Scroll down and tap **"Add to Home Screen"**
+  </Step>
+  <Step title="Confirm">
+    Tap **"Add"** in the top right corner
+  </Step>
+</Steps>
+
+<Warning>
+iOS requires Safari for PWA installation. Chrome/Firefox on iOS don't support the "Add to Home Screen" feature for PWAs.
+</Warning>
+
+### Desktop (Chrome/Edge)
+
+<Steps>
+  <Step title="Open HAPI">
+    Open HAPI in Chrome or Edge browser
+  </Step>
+  <Step title="Install Icon">
+    Click the install icon in the address bar (⊕)
+  </Step>
+  <Step title="Confirm">
+    Or use the menu: **"Install HAPI..."**
+  </Step>
+  <Step title="Launch">
+    HAPI opens as a standalone window
+  </Step>
+</Steps>
+
+## PWA Features
+
+### Offline Mode
+
+When offline, HAPI can:
+
+- Display cached session lists
+- Show previously loaded messages
+- Queue actions for when you're back online
+
+An offline indicator appears when you lose connection.
+
+<Note>
+You must load the app at least once online to enable offline functionality.
+</Note>
+
+### Auto-Update
+
+HAPI automatically checks for updates:
+
+- Updates are checked **hourly** in the background
+- When a new version is available, you'll see a prompt
+- Click **"Reload"** to get the latest version
+
+No manual update process required — HAPI stays up to date automatically.
+
+### Background Sync
+
+Actions taken offline are synced when reconnected:
+
+- Pending messages are sent
+- Permission decisions are relayed
+- Session state is refreshed
+
+## Caching Strategy
+
+HAPI uses intelligent caching for optimal performance:
+
+| Content | Strategy | Duration |
+|---------|----------|----------|
+| App shell | Cache first | Until update |
+| Sessions API | Network first | 5 minutes |
+| Machines API | Network first | 10 minutes |
+| Static assets | Cache first | Forever |
+
+## Push Notifications
+
+HAPI supports push notifications to alert you when agents need attention.
+
+### Enable Notifications
+
+<Steps>
+  <Step title="Open HAPI">
+    Open HAPI — a permission popup appears automatically
+  </Step>
+  <Step title="Allow">
+    Tap **Allow** to enable notifications
+  </Step>
+  <Step title="System Settings">
+    If you missed the popup, go to system settings to grant permission
+  </Step>
+</Steps>
+
+### Notification Types
+
+<CardGroup cols={2}>
+  <Card title="Permission Request" icon="bell">
+    Agent needs your approval for a tool or file operation
+  </Card>
+  <Card title="Session Ready" icon="check-circle">
+    Agent finished a task and awaits your input
+  </Card>
+</CardGroup>
+
+<Tip>
+If push notifications don't work in your region (e.g., FCM unavailable), use [Telegram integration](/features/telegram) instead.
+</Tip>
+
+## Managing Your PWA
+
+### Check Install Status
+
+HAPI shows different UI based on install status:
+
+- **Not installed** - Shows install prompt
+- **Installing** - Shows progress indicator
+- **Installed** - No prompt shown
+
+### Uninstalling
+
+<Tabs>
+  <Tab title="Android">
+    1. Long-press the HAPI icon
+    2. Drag to "Uninstall" or tap the X
+  </Tab>
+  <Tab title="iOS">
+    1. Long-press the HAPI icon
+    2. Tap "Remove App" → "Delete App"
+  </Tab>
+  <Tab title="Desktop">
+    1. Open HAPI
+    2. Click the three-dot menu
+    3. Select "Uninstall HAPI"
+  </Tab>
+</Tabs>
+
+### Clearing Cache
+
+If you experience issues:
+
+<Steps>
+  <Step title="Open in Browser">
+    Open HAPI in browser (not installed version)
+  </Step>
+  <Step title="Developer Tools">
+    Open Developer Tools (F12)
+  </Step>
+  <Step title="Application Tab">
+    Go to Application → Storage
+  </Step>
+  <Step title="Clear Data">
+    Click "Clear site data"
+  </Step>
+</Steps>
+
+## Best Practices
+
+### Battery Optimization (Android)
+
+On Android, disable battery optimization for HAPI to ensure:
+- Background sync works reliably
+- Notifications arrive promptly
+
+**Path**: Settings → Apps → HAPI → Battery → Unrestricted
+
+### Data Usage
+
+HAPI uses minimal data:
+
+- **Initial load**: ~500KB
+- **Cached** after first load
+- Only syncs changed data
+
+### Multiple Devices
+
+You can install HAPI on multiple devices:
+
+- All devices use the same hub server
+- Sessions sync across devices
+- Same access token works everywhere
+
+<Tip>
+Your sessions are server-side, so switching devices is seamless.
+</Tip>
+
+## Browser Compatibility
+
+| Browser | Platform | Support |
+|---------|----------|----------|
+| Chrome | Android | ✅ Full support |
+| Edge | Android | ✅ Full support |
+| Safari | iOS | ⚠️ Limited (no background sync) |
+| Chrome | Desktop | ✅ Full support |
+| Edge | Desktop | ✅ Full support |
+| Firefox | All | ⚠️ Partial (no install prompt) |
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Install Button Not Showing">
+    - Ensure you're using HTTPS (required for PWA)
+    - Try refreshing the page
+    - Check if already installed
+    - Use Chrome or Edge (Firefox doesn't show install prompt)
+  </Accordion>
+
+  <Accordion title="App Not Updating">
+    1. Close the app completely
+    2. Reopen and wait for update prompt
+    3. If stuck, clear cache and reinstall
+  </Accordion>
+
+  <Accordion title="Offline Mode Not Working">
+    - Ensure you've loaded the app at least once online
+    - Check if ServiceWorker is registered (DevTools → Application)
+    - Clear cache and reload
+  </Accordion>
+
+  <Accordion title="iOS-Specific Issues">
+    - Must use Safari for installation
+    - No background sync on iOS (technical limitation)
+    - Limited offline capabilities compared to Android
+    - No push notifications (use Telegram instead)
+  </Accordion>
+
+  <Accordion title="Notifications Not Arriving">
+    - Check browser notification permissions
+    - Disable battery optimization (Android)
+    - Verify VAPID configuration on hub
+    - Consider using Telegram as fallback
+  </Accordion>
+</AccordionGroup>
+
+## Telegram Mini App Alternative
+
+If PWA doesn't suit your needs, consider the Telegram Mini App:
+
+<CardGroup cols={2}>
+  <Card title="Works Inside Telegram" icon="paper-plane">
+    No separate installation required
+  </Card>
+  <Card title="Same Features" icon="clone">
+    Identical functionality to PWA
+  </Card>
+  <Card title="Integrated Notifications" icon="bell">
+    Uses Telegram's notification system
+  </Card>
+  <Card title="Better iOS Support" icon="apple">
+    No Safari limitations
+  </Card>
+</CardGroup>
+
+See [Telegram Integration](/features/telegram) for setup.
+
+## Related Features
+
+<CardGroup cols={3}>
+  <Card title="Remote Control" href="/features/remote-control" icon="mobile">
+    Switch between local and remote modes
+  </Card>
+  <Card title="Telegram" href="/features/telegram" icon="paper-plane">
+    Alternative mobile experience
+  </Card>
+  <Card title="Permissions" href="/features/permissions" icon="shield-check">
+    Approve agent actions on the go
+  </Card>
+</CardGroup>

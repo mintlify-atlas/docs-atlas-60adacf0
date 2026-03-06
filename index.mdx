@@ -1,97 +1,122 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Welcome to HAPI"
+description: "Local-first platform for running AI coding agents with remote control via web, PWA, and Telegram"
 ---
 
-## Setting up
+## What is HAPI?
 
-Get your documentation site up and running in minutes.
+HAPI is a local-first platform that lets you run official AI coding agents (Claude Code, Codex, Cursor Agent, Gemini, OpenCode) locally and control them remotely through a web app, PWA, or Telegram Mini App. Never lose context, switch between local and remote seamlessly, and approve AI requests from anywhere.
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running in 2 minutes with HAPI
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Installation" icon="download" href="/installation">
+    Install HAPI on your machine
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Architecture" icon="diagram-project" href="/concepts/architecture">
+    Understand how HAPI works under the hood
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="CLI Reference" icon="terminal" href="/cli/overview">
+    Explore all CLI commands and options
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Key Features
 
-Everything you need to create world-class documentation.
+<CardGroup cols={2}>
+  <Card title="Seamless Handoff" icon="arrows-left-right">
+    Work locally, switch to remote when needed, switch back anytime. No context loss, no session restart.
+  </Card>
+  <Card title="Native First" icon="laptop-code">
+    HAPI wraps your AI agent instead of replacing it. Same terminal, same experience, same muscle memory.
+  </Card>
+  <Card title="Remote Control" icon="mobile-screen">
+    Approve AI requests from your phone or browser with one tap. Step away from your desk without stopping your work.
+  </Card>
+  <Card title="Multi-Agent Support" icon="users">
+    Claude Code, Codex, Cursor Agent, Gemini, OpenCode—different models, one unified workflow.
+  </Card>
+  <Card title="Terminal Anywhere" icon="terminal">
+    Run commands from your phone or browser, directly connected to the working machine.
+  </Card>
+  <Card title="Voice Control" icon="microphone">
+    Talk to your AI agent hands-free using the built-in voice assistant.
+  </Card>
+</CardGroup>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## Supported Agents
 
-## Need inspiration?
+HAPI supports all major AI coding agents:
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<CardGroup cols={3}>
+  <Card title="Claude Code" icon="c" href="/agents/claude-code">
+    Official Claude Code integration
+  </Card>
+  <Card title="Codex" icon="code" href="/agents/codex">
+    OpenAI Codex mode
+  </Card>
+  <Card title="Cursor Agent" icon="cursor" href="/agents/cursor-agent">
+    Cursor CLI integration
+  </Card>
+  <Card title="Gemini" icon="g" href="/agents/gemini">
+    Gemini via ACP
+  </Card>
+  <Card title="OpenCode" icon="o" href="/agents/opencode">
+    OpenCode via ACP
+  </Card>
+</CardGroup>
+
+## Architecture Overview
+
+HAPI consists of three main components that work together:
+
+<Steps>
+  <Step title="CLI">
+    Wraps your AI agent and connects to the hub via Socket.IO for real-time communication
+  </Step>
+  <Step title="Hub">
+    HTTP API + Socket.IO server that persists sessions in SQLite and broadcasts updates via SSE
+  </Step>
+  <Step title="Web App">
+    React PWA for remote control with live updates and Telegram Mini App integration
+  </Step>
+</Steps>
+
+<Note>
+All data stays on your machine. The relay uses WireGuard + TLS for end-to-end encryption when remote access is needed.
+</Note>
+
+## Popular Use Cases
+
+<AccordionGroup>
+  <Accordion title="Work from anywhere">
+    Start a coding session on your desktop, review and approve changes from your phone during lunch, then resume from your laptop.
+  </Accordion>
+  <Accordion title="Monitor long-running tasks">
+    Let your AI agent work on large refactors while you're in meetings. Get notifications when approval is needed.
+  </Accordion>
+  <Accordion title="Team collaboration">
+    Share sessions with team members using namespaces. Each developer can run their own agents while maintaining isolation.
+  </Accordion>
+  <Accordion title="Voice coding">
+    Use the voice assistant to give instructions hands-free while working on other tasks.
+  </Accordion>
+</AccordionGroup>
+
+## Getting Started
+
+<CardGroup cols={2}>
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Start using HAPI in under 2 minutes
+  </Card>
+  <Card title="Core Concepts" icon="book" href="/concepts/how-it-works">
+    Learn how HAPI works
+  </Card>
+  <Card title="Deployment Options" icon="server" href="/deployment/relay">
+    Choose your deployment method
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/introduction">
+    Integrate with HAPI's API
+  </Card>
+</CardGroup>

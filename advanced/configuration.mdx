@@ -1,0 +1,744 @@
+---
+title: Configuration
+description: Complete reference for HAPI environment variables and settings
+---
+
+HAPI is configured through environment variables and a settings file. This page documents all available configuration options for both the CLI and Hub.
+
+## Configuration Priority
+
+Configuration is loaded with the following priority (highest to lowest):
+
+1. **Environment variables** - Set in your shell or `.env` file
+2. **Settings file** - `~/.hapi/settings.json` (or `$HAPI_HOME/settings.json`)
+3. **Default values** - Built-in defaults
+
+<Info>
+Environment variables always override values in the settings file. When environment variables are used, they're automatically saved to the settings file for future use.
+</Info>
+
+## CLI Configuration
+
+Configuration options for the HAPI CLI client.
+
+### Required Variables
+
+#### CLI_API_TOKEN
+
+Shared secret for authenticating with the HAPI hub.
+
+```bash
+export CLI_API_TOKEN="your-secret-token"
+```
+
+**Format:**
+- Simple: `your-secret-token`
+- With namespace: `your-secret-token:namespace`
+
+**Configuration methods:**
+
+<CodeGroup>
+```bash Environment Variable
+export CLI_API_TOKEN="your-secret-token"
+```
+
+```bash Interactive Login
+hapi auth login
+# Enter token when prompted
+```
+
+```json Settings File (~/.hapi/settings.json)
+{
+  "cliApiToken": "your-secret-token"
+}
+```
+</CodeGroup>
+
+<Warning>
+The CLI token must match the hub's `CLI_API_TOKEN` (base portion for namespaced tokens). Mismatch will result in authentication failures.
+</Warning>
+
+#### HAPI_API_URL
+
+Base URL of the HAPI hub.
+
+```bash
+# Default
+HAPI_API_URL="http://localhost:3006"
+
+# Remote hub
+HAPI_API_URL="https://hapi.example.com"
+```
+
+### Directory Configuration
+
+#### HAPI_HOME
+
+Configuration and data directory for HAPI.
+
+```bash
+# Default
+HAPI_HOME="~/.hapi"
+
+# Custom location
+HAPI_HOME="/opt/hapi-data"
+```
+
+**Directory contents:**
+- `settings.json` - User settings (machineId, token, onboarding)
+- `runner.state.json` - Runner state (PID, port, version, heartbeat)
+- `runner.state.json.lock` - Runner lock file
+- `logs/` - CLI and runner log files
+- `access.key` - Private key (if used)
+
+### Optional Variables
+
+#### HAPI_EXPERIMENTAL
+
+Enable experimental features.
+
+```bash
+# Enable
+export HAPI_EXPERIMENTAL="true"  # or "1" or "yes"
+
+# Disable (default)
+unset HAPI_EXPERIMENTAL
+```
+
+**Accepted values:** `true`, `1`, `yes` (case-insensitive)
+
+#### HAPI_CLAUDE_PATH
+
+Path to a specific Claude CLI executable.
+
+```bash
+# Use custom Claude installation
+export HAPI_CLAUDE_PATH="/opt/claude/bin/claude"
+
+# Use specific version
+export HAPI_CLAUDE_PATH="/usr/local/bin/claude-v2"
+```
+
+<Info>
+If not set, HAPI searches for `claude` on your PATH. This is useful when you have multiple Claude installations or when Claude is not in your PATH.
+</Info>
+
+#### HAPI_HTTP_MCP_URL
+
+Default HTTP MCP (Model Context Protocol) target URL for `hapi mcp` command.
+
+```bash
+# Set default MCP server
+export HAPI_HTTP_MCP_URL="http://localhost:8080"
+
+# Use with hapi mcp (uses default URL)
+hapi mcp
+
+# Override with command line
+hapi mcp --url http://localhost:9000
+```
+
+### Runner Configuration
+
+#### HAPI_RUNNER_HEARTBEAT_INTERVAL
+
+Interval for runner health checks in milliseconds.
+
+```bash
+# Default: 60000 (60 seconds)
+export HAPI_RUNNER_HEARTBEAT_INTERVAL=60000
+
+# More frequent (30 seconds)
+export HAPI_RUNNER_HEARTBEAT_INTERVAL=30000
+
+# Less frequent (2 minutes)
+export HAPI_RUNNER_HEARTBEAT_INTERVAL=120000
+```
+
+**Heartbeat operations:**
+- Prune dead sessions
+- Check for CLI version updates
+- Verify PID ownership
+- Update heartbeat timestamp
+
+<Warning>
+Setting this too low (< 10 seconds) may cause performance issues. Setting it too high (> 5 minutes) delays version detection and session cleanup.
+</Warning>
+
+#### HAPI_RUNNER_HTTP_TIMEOUT
+
+HTTP timeout for runner control requests in milliseconds.
+
+```bash
+# Default: 10000 (10 seconds)
+export HAPI_RUNNER_HTTP_TIMEOUT=10000
+
+# Increase for slow connections
+export HAPI_RUNNER_HTTP_TIMEOUT=30000
+```
+
+**Used by:**
+- `hapi runner stop`
+- `hapi runner list`
+- `hapi runner stop-session`
+- Internal control operations
+
+### Worktree Environment Variables
+
+These variables are automatically set by the runner when spawning worktree sessions. Do not set them manually.
+
+#### HAPI_WORKTREE_BASE_PATH
+
+Base repository path for worktree sessions.
+
+```bash
+# Set automatically by runner
+HAPI_WORKTREE_BASE_PATH="/Users/you/projects/my-repo"
+```
+
+#### HAPI_WORKTREE_BRANCH
+
+Branch name for the worktree.
+
+```bash
+# Set automatically by runner
+HAPI_WORKTREE_BRANCH="hapi-feature-auth"
+```
+
+#### HAPI_WORKTREE_NAME
+
+Worktree name (also the directory name).
+
+```bash
+# Set automatically by runner
+HAPI_WORKTREE_NAME="feature-auth"
+```
+
+#### HAPI_WORKTREE_PATH
+
+Full path to the worktree directory.
+
+```bash
+# Set automatically by runner
+HAPI_WORKTREE_PATH="/Users/you/projects/my-repo-worktrees/feature-auth"
+```
+
+#### HAPI_WORKTREE_CREATED_AT
+
+Worktree creation timestamp in milliseconds.
+
+```bash
+# Set automatically by runner
+HAPI_WORKTREE_CREATED_AT="1703001234567"
+```
+
+<Info>
+For more details on worktrees, see the [Worktrees documentation](/advanced/worktrees).
+</Info>
+
+## Hub Configuration
+
+Configuration options for the HAPI hub server.
+
+### Required Variables
+
+#### CLI_API_TOKEN
+
+Base shared secret for CLI authentication. Clients append `:<namespace>` for isolation.
+
+```bash
+# Auto-generated on first run if not set
+CLI_API_TOKEN="auto-generated-token-123"
+
+# Manually set
+CLI_API_TOKEN="my-secure-token"
+```
+
+**Namespace format:**
+- Hub: `CLI_API_TOKEN="base-token"`
+- Client: `CLI_API_TOKEN="base-token:alice"`
+
+<Warning>
+The hub-side `CLI_API_TOKEN` must NOT include a `:<namespace>` suffix. If it does, the hub strips the suffix and logs a warning.
+</Warning>
+
+### Telegram Configuration
+
+#### TELEGRAM_BOT_TOKEN
+
+Telegram Bot API token from @BotFather.
+
+```bash
+# Get from https://t.me/BotFather
+export TELEGRAM_BOT_TOKEN="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+```
+
+**To enable Telegram:**
+1. Create a bot with @BotFather
+2. Set `TELEGRAM_BOT_TOKEN`
+3. Set `HAPI_PUBLIC_URL` (required for Mini App)
+4. Start the hub
+5. Open `/app` in your bot chat
+
+#### TELEGRAM_NOTIFICATION
+
+Enable or disable Telegram notifications.
+
+```bash
+# Default: true (if TELEGRAM_BOT_TOKEN is set)
+TELEGRAM_NOTIFICATION="true"
+
+# Disable notifications
+TELEGRAM_NOTIFICATION="false"
+```
+
+**Notification types:**
+- Permission requests
+- Session ready notifications
+- Error notifications
+
+### Network Configuration
+
+#### HAPI_LISTEN_HOST
+
+Host/IP address to bind the HTTP service.
+
+```bash
+# Default: localhost only
+HAPI_LISTEN_HOST="127.0.0.1"
+
+# Listen on all interfaces
+HAPI_LISTEN_HOST="0.0.0.0"
+
+# Specific interface
+HAPI_LISTEN_HOST="192.168.1.100"
+```
+
+<Warning>
+Binding to `0.0.0.0` exposes the hub to all network interfaces. Ensure proper firewall rules and use HTTPS in production.
+</Warning>
+
+#### HAPI_LISTEN_PORT
+
+Port for the HTTP service.
+
+```bash
+# Default
+HAPI_LISTEN_PORT="3006"
+
+# Custom port
+HAPI_LISTEN_PORT="8080"
+```
+
+#### HAPI_PUBLIC_URL
+
+Public HTTPS URL for external access (required for Telegram Mini App).
+
+```bash
+# Production
+export HAPI_PUBLIC_URL="https://hapi.example.com"
+
+# Cloudflare Tunnel
+export HAPI_PUBLIC_URL="https://hapi.your-tunnel.trycloudflare.com"
+
+# Tailscale
+export HAPI_PUBLIC_URL="https://hapi.your-tailnet.ts.net"
+```
+
+**Used for:**
+- Telegram Mini App URL
+- Default CORS origins
+- OAuth callbacks (if implemented)
+
+#### CORS_ORIGINS
+
+Comma-separated list of allowed CORS origins.
+
+```bash
+# Allow all (not recommended for production)
+CORS_ORIGINS="*"
+
+# Specific origins
+CORS_ORIGINS="https://app.example.com,https://admin.example.com"
+
+# Derive from HAPI_PUBLIC_URL (automatic if not set)
+# No manual configuration needed
+```
+
+### Data Storage
+
+#### HAPI_HOME
+
+Data directory for hub configuration and state.
+
+```bash
+# Default
+HAPI_HOME="~/.hapi"
+
+# Custom location
+HAPI_HOME="/var/lib/hapi"
+```
+
+#### DB_PATH
+
+SQLite database path.
+
+```bash
+# Default: $HAPI_HOME/hapi.db
+DB_PATH="~/.hapi/hapi.db"
+
+# Custom location
+DB_PATH="/data/hapi/database.db"
+```
+
+**Database contents:**
+- Sessions and session metadata
+- Messages (paginated)
+- Machines and runner state
+- Users (Telegram bindings with namespaces)
+- Todo items extracted from messages
+
+### Relay Configuration
+
+#### HAPI_RELAY_API
+
+Relay API domain for tunwg (WebRTC tunneling).
+
+```bash
+# Default
+HAPI_RELAY_API="relay.hapi.run"
+
+# Custom relay
+HAPI_RELAY_API="relay.your-domain.com"
+```
+
+#### HAPI_RELAY_AUTH
+
+Relay authentication key.
+
+```bash
+# Default
+HAPI_RELAY_AUTH="hapi"
+
+# Custom key
+HAPI_RELAY_AUTH="your-secret-key"
+```
+
+#### HAPI_RELAY_FORCE_TCP
+
+Force TCP relay mode when UDP is unavailable.
+
+```bash
+# Enable
+HAPI_RELAY_FORCE_TCP="true"  # or "1"
+
+# Disable (default)
+unset HAPI_RELAY_FORCE_TCP
+```
+
+### Push Notifications
+
+#### VAPID_SUBJECT
+
+Contact email or URL for Web Push (VAPID protocol).
+
+```bash
+# Default
+VAPID_SUBJECT="mailto:admin@hapi.run"
+
+# Custom
+VAPID_SUBJECT="mailto:your-email@example.com"
+VAPID_SUBJECT="https://your-website.com"
+```
+
+**Used for:**
+- Web Push notification authentication
+- Contact information in push service subscriptions
+
+### Voice Configuration (ElevenLabs)
+
+#### ELEVENLABS_API_KEY
+
+ElevenLabs API key for voice assistant.
+
+```bash
+export ELEVENLABS_API_KEY="your-api-key"
+```
+
+#### ELEVENLABS_AGENT_ID
+
+Custom ElevenLabs agent ID.
+
+```bash
+# Auto-created if not set
+export ELEVENLABS_AGENT_ID="agent-id-123"
+```
+
+## Settings File Format
+
+### CLI Settings File
+
+Location: `~/.hapi/settings.json` (or `$HAPI_HOME/settings.json`)
+
+```json
+{
+  "machineId": "machine-uuid-123",
+  "cliApiToken": "your-secret-token:namespace",
+  "onboardingCompleted": true,
+  "lastUsed": 1703001234567
+}
+```
+
+### Hub Settings File
+
+Location: `~/.hapi/settings.json` (or `$HAPI_HOME/settings.json`)
+
+```json
+{
+  "telegramBotToken": "123456789:ABC...",
+  "telegramNotification": true,
+  "listenHost": "127.0.0.1",
+  "listenPort": 3006,
+  "publicUrl": "https://hapi.example.com",
+  "corsOrigins": ["https://app.example.com"],
+  "cliApiToken": "auto-generated-token-123"
+}
+```
+
+<Info>
+The settings file is automatically created and updated when environment variables are read. You can also manually edit it, but environment variables will override manual changes.
+</Info>
+
+## Configuration Examples
+
+### Local Development
+
+```bash .env
+# CLI
+CLI_API_TOKEN="dev-token"
+HAPI_API_URL="http://localhost:3006"
+HAPI_EXPERIMENTAL="true"
+
+# Hub
+CLI_API_TOKEN="dev-token"
+HAPI_LISTEN_HOST="127.0.0.1"
+HAPI_LISTEN_PORT="3006"
+```
+
+### Production Hub
+
+```bash .env
+# Hub
+CLI_API_TOKEN="${SECRET_TOKEN}"  # From secret manager
+HAPI_LISTEN_HOST="0.0.0.0"
+HAPI_LISTEN_PORT="3006"
+HAPI_PUBLIC_URL="https://hapi.example.com"
+CORS_ORIGINS="https://app.example.com"
+
+# Telegram
+TELEGRAM_BOT_TOKEN="${TELEGRAM_TOKEN}"
+TELEGRAM_NOTIFICATION="true"
+
+# Storage
+HAPI_HOME="/var/lib/hapi"
+DB_PATH="/var/lib/hapi/production.db"
+
+# Push
+VAPID_SUBJECT="mailto:admin@example.com"
+```
+
+### Remote CLI (Connecting to Production)
+
+```bash .env
+# CLI connecting to production hub
+CLI_API_TOKEN="your-production-token:alice"
+HAPI_API_URL="https://hapi.example.com"
+HAPI_HOME="~/.hapi-prod"
+```
+
+### Multi-Namespace Setup
+
+```bash alice.env
+# Alice's configuration
+CLI_API_TOKEN="shared-token:alice"
+HAPI_API_URL="https://shared-hub.example.com"
+HAPI_HOME="~/.hapi-alice"
+```
+
+```bash bob.env
+# Bob's configuration
+CLI_API_TOKEN="shared-token:bob"
+HAPI_API_URL="https://shared-hub.example.com"
+HAPI_HOME="~/.hapi-bob"
+```
+
+### CI/CD Environment
+
+```bash .env.ci
+# Automated testing
+CLI_API_TOKEN="ci-token"
+HAPI_API_URL="http://localhost:3006"
+HAPI_HOME="/tmp/hapi-ci"
+HAPI_EXPERIMENTAL="false"
+HAPI_RUNNER_HEARTBEAT_INTERVAL="30000"
+```
+
+## Environment Variable Reference Table
+
+### CLI Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `CLI_API_TOKEN` | Yes | - | Authentication token (with optional `:namespace`) |
+| `HAPI_API_URL` | No | `http://localhost:3006` | Hub base URL |
+| `HAPI_HOME` | No | `~/.hapi` | Configuration directory |
+| `HAPI_EXPERIMENTAL` | No | `false` | Enable experimental features |
+| `HAPI_CLAUDE_PATH` | No | (auto-detect) | Path to Claude CLI |
+| `HAPI_HTTP_MCP_URL` | No | - | Default MCP server URL |
+| `HAPI_RUNNER_HEARTBEAT_INTERVAL` | No | `60000` | Runner heartbeat interval (ms) |
+| `HAPI_RUNNER_HTTP_TIMEOUT` | No | `10000` | Runner HTTP timeout (ms) |
+| `HAPI_WORKTREE_BASE_PATH` | Auto | - | Worktree base repo path |
+| `HAPI_WORKTREE_BRANCH` | Auto | - | Worktree branch name |
+| `HAPI_WORKTREE_NAME` | Auto | - | Worktree name |
+| `HAPI_WORKTREE_PATH` | Auto | - | Worktree directory path |
+| `HAPI_WORKTREE_CREATED_AT` | Auto | - | Worktree creation timestamp |
+
+### Hub Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `CLI_API_TOKEN` | No | (auto-generated) | Base authentication token |
+| `TELEGRAM_BOT_TOKEN` | No | - | Telegram Bot API token |
+| `TELEGRAM_NOTIFICATION` | No | `true` | Enable Telegram notifications |
+| `HAPI_LISTEN_HOST` | No | `127.0.0.1` | HTTP bind address |
+| `HAPI_LISTEN_PORT` | No | `3006` | HTTP port |
+| `HAPI_PUBLIC_URL` | No | - | Public HTTPS URL |
+| `CORS_ORIGINS` | No | (auto-derived) | Allowed CORS origins |
+| `HAPI_HOME` | No | `~/.hapi` | Data directory |
+| `DB_PATH` | No | `$HAPI_HOME/hapi.db` | SQLite database path |
+| `HAPI_RELAY_API` | No | `relay.hapi.run` | Relay API domain |
+| `HAPI_RELAY_AUTH` | No | `hapi` | Relay auth key |
+| `HAPI_RELAY_FORCE_TCP` | No | `false` | Force TCP relay mode |
+| `VAPID_SUBJECT` | No | `mailto:admin@hapi.run` | VAPID subject for Web Push |
+| `ELEVENLABS_API_KEY` | No | - | ElevenLabs API key |
+| `ELEVENLABS_AGENT_ID` | No | (auto-created) | ElevenLabs agent ID |
+
+## Troubleshooting
+
+### Configuration Not Loading
+
+<AccordionGroup>
+  <Accordion title="Environment variable ignored">
+    **Check priority:** Environment variables override settings file. Ensure you're setting the variable in the correct shell session:
+    
+    ```bash
+    # Verify variable is set
+    echo $CLI_API_TOKEN
+    
+    # Check effective configuration
+    hapi auth status
+    ```
+  </Accordion>
+
+  <Accordion title="Settings file not updating">
+    **Permissions issue:** Ensure `~/.hapi/` directory is writable:
+    
+    ```bash
+    ls -la ~/.hapi/
+    chmod u+w ~/.hapi/settings.json
+    ```
+  </Accordion>
+
+  <Accordion title="HAPI_HOME not respected">
+    **Must be set before first run:** HAPI_HOME must be set before any HAPI command:
+    
+    ```bash
+    export HAPI_HOME="/custom/path"
+    hapi auth login
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Authentication Failures
+
+<AccordionGroup>
+  <Accordion title="401 Unauthorized">
+    **Token mismatch:** Verify CLI and Hub tokens match (base portion for namespaces):
+    
+    ```bash
+    # CLI
+    echo $CLI_API_TOKEN  # your-token:namespace
+    
+    # Hub (should be base only)
+    echo $CLI_API_TOKEN  # your-token
+    ```
+  </Accordion>
+
+  <Accordion title="Namespace isolation not working">
+    **Incorrect token format:** Ensure namespace is appended with colon:
+    
+    ```bash
+    # Correct
+    CLI_API_TOKEN="base:alice"
+    
+    # Incorrect
+    CLI_API_TOKEN="base-alice"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Connection Issues
+
+<AccordionGroup>
+  <Accordion title="Cannot connect to hub">
+    **Check URL and network:**
+    
+    ```bash
+    # Verify URL is reachable
+    curl $HAPI_API_URL/api/health
+    
+    # Check DNS resolution
+    nslookup hapi.example.com
+    ```
+  </Accordion>
+
+  <Accordion title="CORS errors in browser">
+    **Check CORS_ORIGINS:**
+    
+    ```bash
+    # Add your frontend origin
+    export CORS_ORIGINS="https://your-app.com,https://admin.your-app.com"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use .env Files" icon="file">
+    Store configuration in `.env` files and load with `source .env` or `dotenv` tools
+  </Card>
+  <Card title="Separate Environments" icon="layer-group">
+    Use different `HAPI_HOME` directories for dev, staging, and production
+  </Card>
+  <Card title="Secure Tokens" icon="lock">
+    Never commit tokens to version control. Use secret managers in production
+  </Card>
+  <Card title="Document Custom Configs" icon="book">
+    Document any non-default settings in your team's runbook
+  </Card>
+</CardGroup>
+
+## Related Topics
+
+<CardGroup cols={3}>
+  <Card title="Namespaces" href="/advanced/namespaces" icon="users">
+    Multi-user isolation for shared hubs
+  </Card>
+  <Card title="Runner" href="/advanced/runner" icon="rocket">
+    Background daemon configuration
+  </Card>
+  <Card title="Worktrees" href="/advanced/worktrees" icon="git-alt">
+    Git worktree environment variables
+  </Card>
+</CardGroup>

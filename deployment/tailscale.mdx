@@ -1,0 +1,388 @@
+---
+title: Tailscale
+description: Deploy HAPI with Tailscale for secure private network access
+---
+
+Tailscale creates a secure mesh VPN between your devices using WireGuard. It's ideal for accessing HAPI from your personal devices or sharing with a team without exposing services to the public internet.
+
+## Why Tailscale?
+
+<CardGroup cols={2}>
+  <Card title="Private network" icon="lock">
+    Zero-trust network access without public exposure
+  </Card>
+
+  <Card title="Simple setup" icon="bolt">
+    Install, authenticate, and you're connected
+  </Card>
+
+  <Card title="Multi-device" icon="devices">
+    Access from all your devices automatically
+  </Card>
+
+  <Card title="Team sharing" icon="users">
+    Share access with team members securely
+  </Card>
+</CardGroup>
+
+## Prerequisites
+
+- Tailscale account (free for personal use, up to 100 devices)
+- Tailscale installed on all devices that need access
+
+## Setup
+
+<Steps>
+  <Step title="Install Tailscale">
+    Download from [tailscale.com/download](https://tailscale.com/download)
+
+    ```bash
+    # macOS
+    brew install --cask tailscale
+
+    # Ubuntu/Debian
+    curl -fsSL https://tailscale.com/install.sh | sh
+
+    # Arch Linux
+    sudo pacman -S tailscale
+
+    # Windows: Download installer from tailscale.com
+    ```
+  </Step>
+
+  <Step title="Authenticate and connect">
+    ```bash
+    sudo tailscale up
+    ```
+
+    This opens a browser to authenticate with your Tailscale account.
+  </Step>
+
+  <Step title="Get your Tailscale IP">
+    ```bash
+    tailscale ip -4
+    ```
+
+    Example output: `100.64.123.45`
+  </Step>
+
+  <Step title="Start HAPI hub">
+    ```bash
+    export HAPI_PUBLIC_URL="http://100.64.123.45:3006"
+    hapi hub
+    ```
+
+    The hub is now accessible via your Tailscale network.
+  </Step>
+
+  <Step title="Access from other devices">
+    Install Tailscale on your phone or other computer, then open:
+
+    ```
+    http://100.64.123.45:3006
+    ```
+
+    <Note>
+      Use the Tailscale IP from step 3, not your local network IP.
+    </Note>
+  </Step>
+</Steps>
+
+## Configuration
+
+### HAPI environment variables
+
+```bash
+# Get your Tailscale IP
+TAILSCALE_IP=$(tailscale ip -4)
+
+# Configure HAPI
+export HAPI_PUBLIC_URL="http://${TAILSCALE_IP}:3006"
+export HAPI_LISTEN_HOST=0.0.0.0  # Required for Tailscale access
+export HAPI_LISTEN_PORT=3006
+
+hapi hub
+```
+
+### Use MagicDNS (recommended)
+
+Tailscale provides [MagicDNS](https://tailscale.com/kb/1081/magicdns/) for friendly hostnames:
+
+1. Enable MagicDNS in [Tailscale admin console](https://login.tailscale.com/admin/dns)
+2. Your machine gets a hostname like `machine-name.tail-xxxxx.ts.net`
+3. Use the hostname instead of IP:
+
+```bash
+export HAPI_PUBLIC_URL="http://your-machine.tail-xxxxx.ts.net:3006"
+hapi hub
+```
+
+<Note>
+  MagicDNS makes URLs stable across IP changes and easier to remember.
+</Note>
+
+## HTTPS with Tailscale
+
+### Option 1: Tailscale HTTPS (recommended)
+
+Tailscale can provision HTTPS certificates automatically:
+
+<Steps>
+  <Step title="Enable HTTPS">
+    ```bash
+    sudo tailscale cert your-machine.tail-xxxxx.ts.net
+    ```
+
+    Certificates are saved to `/var/lib/tailscale/certs/`
+  </Step>
+
+  <Step title="Configure reverse proxy">
+    Use Caddy or Nginx to serve HTTPS:
+
+    **Caddy:**
+    ```caddyfile
+    your-machine.tail-xxxxx.ts.net {
+        tls /var/lib/tailscale/certs/your-machine.tail-xxxxx.ts.net.crt \
+            /var/lib/tailscale/certs/your-machine.tail-xxxxx.ts.net.key
+        reverse_proxy localhost:3006
+    }
+    ```
+
+    **Nginx:**
+    ```nginx
+    server {
+        listen 443 ssl http2;
+        server_name your-machine.tail-xxxxx.ts.net;
+
+        ssl_certificate /var/lib/tailscale/certs/your-machine.tail-xxxxx.ts.net.crt;
+        ssl_certificate_key /var/lib/tailscale/certs/your-machine.tail-xxxxx.ts.net.key;
+
+        location / {
+            proxy_pass http://localhost:3006;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="Update HAPI_PUBLIC_URL">
+    ```bash
+    export HAPI_PUBLIC_URL="https://your-machine.tail-xxxxx.ts.net"
+    hapi hub
+    ```
+  </Step>
+</Steps>
+
+### Option 2: Tailscale Serve (beta)
+
+Tailscale's built-in reverse proxy (no separate web server needed):
+
+```bash
+# Serve HAPI on HTTPS
+sudo tailscale serve https:443 http://localhost:3006
+
+# Check status
+tailscale serve status
+```
+
+<Note>
+  Tailscale Serve is in beta. See [Tailscale Serve docs](https://tailscale.com/kb/1242/tailscale-serve/) for details.
+</Note>
+
+## Team access
+
+Share HAPI with team members:
+
+<Steps>
+  <Step title="Invite team members">
+    In [Tailscale admin console](https://login.tailscale.com/admin/users), invite users to your tailnet.
+  </Step>
+
+  <Step title="Share the URL">
+    Team members access via the same Tailscale URL:
+
+    ```
+    http://your-machine.tail-xxxxx.ts.net:3006
+    ```
+  </Step>
+
+  <Step title="Optional: Set up ACLs">
+    Control who can access HAPI using [Tailscale ACLs](https://tailscale.com/kb/1018/acls/):
+
+    ```json
+    {
+      "acls": [
+        {
+          "action": "accept",
+          "src": ["group:engineering"],
+          "dst": ["your-machine:3006"]
+        }
+      ]
+    }
+    ```
+  </Step>
+</Steps>
+
+## CLI configuration
+
+On client machines (also on Tailscale), configure the CLI:
+
+```bash
+export HAPI_API_URL="http://100.64.123.45:3006"
+export CLI_API_TOKEN="your-token-here"
+hapi
+```
+
+Or use interactive login:
+
+```bash
+hapi auth login
+```
+
+## Run as background service
+
+### Start both Tailscale and HAPI on boot
+
+**Linux (systemd):**
+
+```bash
+# Tailscale starts automatically after installation
+
+# Create HAPI service
+sudo systemctl --user enable hapi-hub
+sudo systemctl --user start hapi-hub
+```
+
+**macOS (launchd):**
+
+```bash
+# Tailscale starts automatically
+
+# Load HAPI service
+launchctl load ~/Library/LaunchAgents/com.hapi.hub.plist
+```
+
+**Using pm2:**
+
+```bash
+pm2 start "hapi hub" --name hapi-hub
+pm2 save
+pm2 startup
+```
+
+See [Installation Guide](/installation#background-service-deployment) for service configuration examples.
+
+## Telegram integration
+
+Tailscale with HTTPS enables Telegram Mini App:
+
+```bash
+export TELEGRAM_BOT_TOKEN="your-bot-token"
+export HAPI_PUBLIC_URL="https://your-machine.tail-xxxxx.ts.net"
+hapi hub
+```
+
+<Warning>
+  Telegram Mini Apps require HTTPS. Use Tailscale HTTPS certificates or Tailscale Serve.
+</Warning>
+
+## Troubleshooting
+
+### Cannot access from other devices
+
+1. Verify Tailscale is running:
+   ```bash
+   tailscale status
+   ```
+
+2. Check HAPI is listening on `0.0.0.0`:
+   ```bash
+   export HAPI_LISTEN_HOST=0.0.0.0
+   hapi hub
+   ```
+
+3. Test locally first:
+   ```bash
+   curl http://localhost:3006/api/health
+   ```
+
+4. Verify firewall isn't blocking:
+   ```bash
+   # Allow port 3006
+   sudo ufw allow 3006
+   ```
+
+### MagicDNS not working
+
+1. Enable MagicDNS in [admin console](https://login.tailscale.com/admin/dns)
+2. Restart Tailscale:
+   ```bash
+   sudo tailscale down
+   sudo tailscale up
+   ```
+3. Verify DNS:
+   ```bash
+   tailscale status --json | grep HostName
+   ```
+
+### HTTPS certificate errors
+
+1. Regenerate certificates:
+   ```bash
+   sudo tailscale cert --force your-machine.tail-xxxxx.ts.net
+   ```
+
+2. Verify certificate files exist:
+   ```bash
+   ls -l /var/lib/tailscale/certs/
+   ```
+
+3. Check reverse proxy configuration
+
+## Comparison with other options
+
+| Feature | Relay | Tailscale | Self-hosted |
+|---------|-------|-----------|-------------|
+| **Setup complexity** | One command | Install + auth | Port forwarding + HTTPS |
+| **Public access** | Yes | No (private network) | Yes |
+| **Network type** | Public relay | Private VPN | Public or private |
+| **Team sharing** | Via URL | Via tailnet | Via firewall rules |
+| **Encryption** | WireGuard + TLS | WireGuard | TLS (if configured) |
+| **Cost** | Free | Free (up to 100 devices) | Server costs |
+
+## When to use Tailscale
+
+Ideal when you:
+
+- Want secure access across your devices
+- Need to share with a small team privately
+- Don't want public internet exposure
+- Already use Tailscale for other services
+- Want simple VPN-based access
+- Need stable access across network changes
+
+<Note>
+  Tailscale is perfect for personal use and small teams. For public access or Telegram Mini App, consider [Relay](/deployment/relay) or [Cloudflare Tunnel](/deployment/cloudflare-tunnel).
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Runner Setup" icon="play" href="/installation#runner-setup">
+    Enable remote session spawning
+  </Card>
+
+  <Card title="Telegram Setup" icon="paper-plane" href="/installation#telegram-setup">
+    Configure Telegram (requires HTTPS)
+  </Card>
+</CardGroup>
+
+## Resources
+
+- [Tailscale Documentation](https://tailscale.com/kb/)
+- [MagicDNS Guide](https://tailscale.com/kb/1081/magicdns/)
+- [Tailscale HTTPS Certificates](https://tailscale.com/kb/1153/enabling-https/)
+- [Tailscale ACLs](https://tailscale.com/kb/1018/acls/)

@@ -1,0 +1,471 @@
+---
+title: Architecture
+description: Technical architecture and components of the HAPI platform
+---
+
+## Overview
+
+HAPI is built on a local-first architecture with three main components that work together to provide remote control of AI coding agents. The system is designed for real-time synchronization, seamless mode switching, and multi-agent support.
+
+## Three-Tier Architecture
+
+<Steps>
+  <Step title="CLI (Client Layer)">
+    Wraps AI coding agents and manages local execution. Connects to the Hub via Socket.IO for real-time bidirectional communication.
+  </Step>
+  <Step title="Hub (Server Layer)">
+    Central coordination service that handles persistence, real-time sync, and API endpoints. Acts as the bridge between CLI and Web clients.
+  </Step>
+  <Step title="Web (Presentation Layer)">
+    React-based PWA for remote control. Receives live updates via SSE and sends commands via REST API.
+  </Step>
+</Steps>
+
+```
+┌─────────┐  Socket.IO   ┌─────────┐   SSE/REST   ┌─────────┐
+│   CLI   │ ──────────── │   Hub   │ ──────────── │   Web   │
+│ (agent) │              │ (server)│              │  (PWA)  │
+└─────────┘              └─────────┘              └─────────┘
+     │                        │                        │
+     ├─ Wraps Claude/Codex    ├─ SQLite persistence   ├─ TanStack Query
+     ├─ Socket.IO client      ├─ Session cache        ├─ SSE for updates
+     └─ RPC handlers          ├─ RPC gateway          └─ assistant-ui
+                              └─ Telegram bot
+```
+
+## Component Details
+
+### CLI Component
+
+The CLI is a Bun-based binary that wraps multiple AI coding agents:
+
+<CardGroup cols={2}>
+  <Card title="Agent Wrappers" icon="robot">
+    - Claude Code integration
+    - Codex mode (OpenAI)
+    - Cursor Agent mode
+    - Gemini via ACP
+    - OpenCode via ACP
+  </Card>
+  <Card title="Core Services" icon="gear">
+    - Socket.IO client
+    - RPC handler registry
+    - Background runner daemon
+    - Tool implementations
+  </Card>
+</CardGroup>
+
+**Key Directories:**
+
+```
+cli/src/
+├── api/          # Hub connection (Socket.IO client, auth)
+├── claude/       # Claude Code integration
+├── codex/        # Codex mode integration
+├── cursor/       # Cursor Agent integration
+├── agent/        # Multi-agent support (Gemini via ACP)
+├── opencode/     # OpenCode ACP + hook integration
+├── runner/       # Background daemon for remote spawn
+├── commands/     # CLI subcommands
+├── modules/      # Tool implementations (ripgrep, git)
+└── ui/           # Terminal UI (Ink components)
+```
+
+### Hub Component
+
+The Hub is a Bun HTTP server with multiple transport layers:
+
+<CardGroup cols={2}>
+  <Card title="Communication" icon="wifi">
+    - REST API (Express-like)
+    - Socket.IO server
+    - Server-Sent Events (SSE)
+    - Telegram bot integration
+  </Card>
+  <Card title="Storage & Logic" icon="database">
+    - SQLite persistence (better-sqlite3)
+    - In-memory session cache
+    - RPC gateway
+    - Message service
+  </Card>
+</CardGroup>
+
+**Key Directories:**
+
+```
+hub/src/
+├── web/routes/              # REST API endpoints
+├── socket/                  # Socket.IO setup
+├── socket/handlers/cli/     # CLI event handlers
+├── sync/                    # Core logic
+│   ├── sessionCache.ts      # In-memory cache
+│   ├── messageService.ts    # Message handling
+│   └── rpcGateway.ts        # RPC routing
+├── store/                   # SQLite persistence
+├── sse/                     # Server-Sent Events manager
+├── telegram/                # Bot commands, callbacks
+├── notifications/           # Push (VAPID) and Telegram
+└── config/                  # Settings loading
+```
+
+### Web Component
+
+A React 19 PWA built with modern tooling:
+
+<CardGroup cols={2}>
+  <Card title="UI Stack" icon="window">
+    - React 19 + Vite
+    - TanStack Router/Query
+    - Tailwind CSS
+    - @assistant-ui/react
+  </Card>
+  <Card title="Features" icon="sparkles">
+    - Session management
+    - Real-time chat interface
+    - Permission workflows
+    - File browser with git
+  </Card>
+</CardGroup>
+
+**Key Directories:**
+
+```
+web/src/
+├── routes/              # TanStack Router pages
+├── components/          # Reusable UI
+├── hooks/queries/       # TanStack Query hooks
+├── hooks/mutations/     # Mutation hooks
+├── hooks/useSSE.ts      # SSE subscription
+└── api/client.ts        # API client wrapper
+```
+
+## Technology Stack
+
+### Runtime & Build Tools
+
+<CodeGroup>
+
+```bash CLI
+# Runtime: Bun
+# Build: bun build --compile
+# Package manager: Bun workspaces
+```
+
+```bash Hub
+# Runtime: Bun
+# HTTP: Native Bun.serve
+# WebSocket: Socket.IO
+# Database: better-sqlite3
+```
+
+```bash Web
+# Runtime: Browser
+# Build: Vite
+# Bundler: esbuild (via Vite)
+```
+
+</CodeGroup>
+
+### Key Dependencies
+
+| Component | Technology | Purpose |
+|-----------|-----------|----------|
+| **CLI** | Bun, Socket.IO client, Ink | Agent wrapping, terminal UI |
+| **Hub** | Bun, Socket.IO, better-sqlite3 | Real-time sync, persistence |
+| **Web** | React 19, TanStack Router/Query, Tailwind | PWA interface |
+| **Shared** | Zod, TypeScript | Type-safe schemas, validation |
+
+## Real-Time Synchronization
+
+### Data Flow Architecture
+
+<Steps>
+  <Step title="CLI → Hub (Socket.IO)">
+    Agent events flow from CLI to Hub via Socket.IO events like `message`, `update-metadata`, and `update-state`.
+  </Step>
+  <Step title="Hub → Database">
+    Hub persists all events to SQLite and updates in-memory session cache.
+  </Step>
+  <Step title="Hub → Web (SSE)">
+    Hub broadcasts updates to all connected web clients via Server-Sent Events.
+  </Step>
+  <Step title="Web → Hub (REST)">
+    User actions from web trigger REST API calls that route back to CLI via RPC.
+  </Step>
+</Steps>
+
+### Communication Protocols
+
+#### Socket.IO Events (CLI ↔ Hub)
+
+<Tabs>
+  <Tab title="Client → Server">
+    ```typescript
+    // From shared/src/socket.ts
+    interface ClientToServerEvents {
+      message: (data: { sid: string; message: unknown; localId?: string }) => void
+      'session-alive': (data: {
+        sid: string
+        time: number
+        thinking: boolean
+        mode?: 'local' | 'remote'
+        permissionMode?: PermissionMode
+        modelMode?: ModelMode
+      }) => void
+      'session-end': (data: { sid: string; time: number }) => void
+      'update-metadata': (data: {
+        sid: string
+        expectedVersion: number
+        metadata: unknown
+      }, cb: (answer: { result: 'success' | 'version-mismatch' | 'error' }) => void) => void
+      'update-state': (data: {
+        sid: string
+        expectedVersion: number
+        agentState: unknown | null
+      }, cb: (answer: { result: 'success' | 'version-mismatch' | 'error' }) => void) => void
+      'rpc-register': (data: { method: string }) => void
+      'rpc-unregister': (data: { method: string }) => void
+    }
+    ```
+  </Tab>
+  <Tab title="Server → Client">
+    ```typescript
+    interface ServerToClientEvents {
+      update: (data: Update) => void
+      'rpc-request': (data: {
+        method: string
+        params: string
+      }, callback: (response: string) => void) => void
+      error: (data: {
+        message: string
+        code?: 'namespace-missing' | 'access-denied' | 'not-found'
+        scope?: 'session' | 'machine'
+        id?: string
+      }) => void
+    }
+    ```
+  </Tab>
+</Tabs>
+
+#### SSE Events (Hub → Web)
+
+```typescript
+// From shared/src/schemas.ts
+type SyncEvent =
+  | { type: 'session-added'; sessionId: string; namespace?: string }
+  | { type: 'session-updated'; sessionId: string; namespace?: string }
+  | { type: 'session-removed'; sessionId: string; namespace?: string }
+  | { type: 'message-received'; sessionId: string; message: DecryptedMessage }
+  | { type: 'machine-updated'; machineId: string; namespace?: string }
+  | { type: 'toast'; data: { title: string; body: string; sessionId: string; url: string } }
+  | { type: 'heartbeat'; data: { timestamp: number } }
+```
+
+<Note>
+SSE provides a unidirectional stream from Hub to Web. For web-initiated actions, the REST API is used with RPC routing to the CLI.
+</Note>
+
+## Security Model
+
+### Authentication & Authorization
+
+<CardGroup cols={2}>
+  <Card title="Token-Based Auth" icon="key">
+    - `CLI_API_TOKEN` shared secret
+    - Namespace isolation via `token:<namespace>`
+    - JWT tokens with auto-refresh
+  </Card>
+  <Card title="Telegram Integration" icon="paper-plane">
+    - WebApp initData verification
+    - User binding via namespace
+    - Deep linking to sessions
+  </Card>
+</CardGroup>
+
+### Namespace Isolation
+
+Multi-user support through namespace suffix:
+
+```typescript
+// Clients append namespace to token
+const token = `${CLI_API_TOKEN}:${namespace}`
+
+// Hub isolates sessions by namespace
+function getSessionsByNamespace(namespace: string): Session[] {
+  return sessions.filter(s => s.namespace === namespace)
+}
+```
+
+<Warning>
+**Transport security depends on HTTPS** in front of the hub. Always use a tunnel (Cloudflare, Tailscale) or reverse proxy with TLS for production deployments.
+</Warning>
+
+### Data Encryption
+
+Currently, HAPI relies on transport-layer security (HTTPS/WSS). Message content is not encrypted at rest in SQLite.
+
+## RPC Gateway
+
+### Bidirectional RPC Pattern
+
+The Hub acts as an RPC gateway between Web and CLI:
+
+<Steps>
+  <Step title="CLI Registration">
+    CLI registers RPC handlers via `rpc-register` event with method name.
+  </Step>
+  <Step title="Web Request">
+    Web sends REST request to Hub (e.g., `POST /api/sessions/:id/abort`).
+  </Step>
+  <Step title="Hub Routing">
+    Hub looks up registered handler and emits `rpc-request` to CLI via Socket.IO.
+  </Step>
+  <Step title="CLI Response">
+    CLI executes handler and sends response via callback.
+  </Step>
+  <Step title="Hub Response">
+    Hub returns result to Web via REST response.
+  </Step>
+</Steps>
+
+```typescript
+// CLI registers handler
+await socket.emit('rpc-register', { method: 'abort-session' })
+
+// Hub routes RPC request
+socket.emit('rpc-request', { method: 'abort-session', params: '{}' }, (response) => {
+  // Handle response
+})
+```
+
+<Check>
+This design allows the CLI to remain the source of truth for session control while enabling web-based remote operations.
+</Check>
+
+## Versioned Updates
+
+To prevent race conditions, metadata and agent state updates use optimistic versioning:
+
+```typescript
+// From cli/src/api/apiSession.ts (inferred pattern)
+await socket.emit('update-metadata', {
+  sid: sessionId,
+  expectedVersion: session.metadataVersion,
+  metadata: newMetadata
+}, (response) => {
+  if (response.result === 'version-mismatch') {
+    // Handle conflict: hub rejected stale update
+    console.error('Version mismatch, fetching latest')
+  }
+})
+```
+
+<Info>
+The Hub rejects updates with stale version numbers and returns the current version, forcing clients to reconcile.
+</Info>
+
+## Session Cache Pattern
+
+The Hub maintains an in-memory cache for fast access:
+
+```typescript
+// From hub/src/sync/sessionCache.ts
+export class SessionCache {
+  private readonly sessions: Map<string, Session> = new Map()
+
+  getSessionByNamespace(sessionId: string, namespace: string): Session | undefined {
+    const session = this.sessions.get(sessionId)
+    if (!session || session.namespace !== namespace) {
+      return undefined
+    }
+    return session
+  }
+
+  refreshSession(sessionId: string): Session | null {
+    let stored = this.store.sessions.getSession(sessionId)
+    if (!stored) {
+      this.sessions.delete(sessionId)
+      return null
+    }
+    // ... parse and validate
+    this.sessions.set(sessionId, session)
+    return session
+  }
+}
+```
+
+<Note>
+Cache entries are lazily refreshed from SQLite when accessed. This hybrid approach balances speed and consistency.
+</Note>
+
+## Build & Deployment
+
+### Single Binary Workflow
+
+HAPI can be built as an all-in-one executable:
+
+```bash
+# Build all components
+bun run build:single-exe
+
+# Output: hapi (contains CLI + Hub + embedded Web assets)
+```
+
+### Component Builds
+
+<CodeGroup>
+
+```bash CLI
+bun run build:cli
+bun run build:cli:exe
+```
+
+```bash Hub
+bun run build:hub
+# Output: hub/dist/index.js
+```
+
+```bash Web
+bun run build:web
+# Output: web/dist/ (static assets)
+```
+
+</CodeGroup>
+
+### Standalone Web Hosting
+
+The web app can be hosted separately (e.g., GitHub Pages):
+
+<Steps>
+  <Step title="Build with base path">
+    ```bash
+    bun run build:web -- --base /<repo>/
+    ```
+  </Step>
+  <Step title="Deploy web/dist">
+    Upload to static hosting provider.
+  </Step>
+  <Step title="Configure CORS">
+    Set `CORS_ORIGINS` or `HAPI_PUBLIC_URL` on Hub to allow static origin.
+  </Step>
+  <Step title="Connect via UI">
+    Click Hub button on login screen and enter Hub origin.
+  </Step>
+</Steps>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="How It Works" href="/concepts/how-it-works" icon="circle-play">
+    Session lifecycle and data flow
+  </Card>
+  <Card title="Sessions" href="/concepts/sessions" icon="layer-group">
+    Session metadata and state management
+  </Card>
+  <Card title="Agents" href="/concepts/agents" icon="robot">
+    Multi-agent support and flavors
+  </Card>
+  <Card title="API Reference" href="/api/sessions" icon="code">
+    REST API endpoints
+  </Card>
+</CardGroup>

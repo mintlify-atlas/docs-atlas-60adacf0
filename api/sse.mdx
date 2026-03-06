@@ -1,0 +1,555 @@
+---
+title: Server-Sent Events (SSE)
+description: Real-time event streaming from hub to web clients
+---
+
+## Overview
+
+Server-Sent Events (SSE) provide one-way, real-time event streaming from the hub to web clients.
+
+**Use Cases:**
+
+- Live session updates
+- New messages
+- Permission requests
+- Session state changes
+- Heartbeat/keepalive
+
+## GET /api/events
+
+Subscribe to real-time events.
+
+**Authentication:** Required
+
+### Query Parameters
+
+<ParamField query="all" type="boolean" default="false">
+  Receive all events in namespace (default: only session-specific events)
+</ParamField>
+
+<ParamField query="sessionId" type="string" optional>
+  Filter events for specific session
+</ParamField>
+
+<ParamField query="machineId" type="string" optional>
+  Filter events for specific machine
+</ParamField>
+
+<ParamField query="visibility" type="string" default="hidden">
+  Initial visibility state: `visible` or `hidden`
+</ParamField>
+
+### Response
+
+SSE stream with `text/event-stream` content type.
+
+### Example: Subscribe to All Events
+
+```javascript
+const eventSource = new EventSource(
+  'http://127.0.0.1:3006/api/events?all=true',
+  {
+    headers: {
+      'Authorization': 'Bearer ' + token
+    }
+  }
+)
+
+eventSource.onmessage = (event) => {
+  const data = JSON.parse(event.data)
+  console.log('Event:', data)
+}
+
+eventSource.onerror = (error) => {
+  console.error('SSE error:', error)
+}
+```
+
+### Example: Subscribe to Session
+
+```javascript
+const eventSource = new EventSource(
+  'http://127.0.0.1:3006/api/events?sessionId=abc123&visibility=visible'
+)
+
+eventSource.addEventListener('message', (event) => {
+  const data = JSON.parse(event.data)
+  
+  switch (data.type) {
+    case 'message-received':
+      handleNewMessage(data.message)
+      break
+    case 'session-updated':
+      handleSessionUpdate(data.sessionId)
+      break
+  }
+})
+```
+
+### Errors
+
+- `403` - Access denied (session/machine belongs to different namespace)
+- `404` - Session or machine not found
+- `503` - Hub not connected
+
+---
+
+## Event Types
+
+### connection-changed
+
+Connection status update.
+
+```json
+{
+  "type": "connection-changed",
+  "data": {
+    "status": "connected",
+    "subscriptionId": "sub_abc123"
+  }
+}
+```
+
+Sent immediately after connecting.
+
+---
+
+### heartbeat
+
+Keep-alive ping.
+
+```json
+{
+  "type": "heartbeat",
+  "data": {
+    "timestamp": 1709856000000
+  }
+}
+```
+
+Sent periodically to keep connection alive.
+
+---
+
+### session-added
+
+New session created.
+
+```json
+{
+  "type": "session-added",
+  "namespace": "default",
+  "sessionId": "abc123",
+  "data": {
+    "sid": "abc123"
+  }
+}
+```
+
+---
+
+### session-updated
+
+Session metadata or state changed.
+
+```json
+{
+  "type": "session-updated",
+  "namespace": "default",
+  "sessionId": "abc123",
+  "data": {
+    "sid": "abc123"
+  }
+}
+```
+
+**Triggers:**
+
+- Metadata update
+- Agent state change
+- Permission mode change
+- Model mode change
+- Session rename
+
+---
+
+### session-removed
+
+Session deleted.
+
+```json
+{
+  "type": "session-removed",
+  "namespace": "default",
+  "sessionId": "abc123"
+}
+```
+
+---
+
+### message-received
+
+New message in session.
+
+```json
+{
+  "type": "message-received",
+  "namespace": "default",
+  "sessionId": "abc123",
+  "message": {
+    "id": "msg_xyz789",
+    "seq": 42,
+    "localId": "local-456",
+    "content": {
+      "type": "text",
+      "text": "Hello from agent"
+    },
+    "createdAt": 1709856000000
+  }
+}
+```
+
+---
+
+### machine-updated
+
+Machine metadata or state changed.
+
+```json
+{
+  "type": "machine-updated",
+  "namespace": "default",
+  "machineId": "machine_xyz",
+  "data": {
+    "id": "machine_xyz"
+  }
+}
+```
+
+---
+
+### toast
+
+Notification to display.
+
+```json
+{
+  "type": "toast",
+  "namespace": "default",
+  "data": {
+    "title": "Permission Request",
+    "body": "Claude wants to edit src/main.ts",
+    "sessionId": "abc123",
+    "url": "/sessions/abc123"
+  }
+}
+```
+
+**Common scenarios:**
+
+- Permission request pending
+- Session ready
+- Error occurred
+
+---
+
+## Visibility Tracking
+
+The hub tracks which SSE connections are actively viewing content to optimize notifications.
+
+### POST /api/visibility
+
+Update visibility state for a subscription.
+
+**Authentication:** Required
+
+### Request Body
+
+<ParamField body="subscriptionId" type="string" required>
+  Subscription ID from connection-changed event
+</ParamField>
+
+<ParamField body="visibility" type="string" required>
+  Visibility state: `visible` or `hidden`
+</ParamField>
+
+### Response
+
+```json
+{"ok": true}
+```
+
+### Example
+
+```javascript
+let subscriptionId = null
+
+eventSource.onmessage = (event) => {
+  const data = JSON.parse(event.data)
+  if (data.type === 'connection-changed') {
+    subscriptionId = data.data.subscriptionId
+  }
+}
+
+// When tab becomes visible
+document.addEventListener('visibilitychange', async () => {
+  if (!subscriptionId) return
+  
+  await fetch('/api/visibility', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      subscriptionId,
+      visibility: document.hidden ? 'hidden' : 'visible'
+    })
+  })
+})
+```
+
+**Purpose:**
+
+- Skip notifications for hidden tabs
+- Prioritize visible connections
+- Optimize resource usage
+
+---
+
+## Connection Management
+
+### Reconnection
+
+EventSource automatically reconnects on disconnect:
+
+```javascript
+const eventSource = new EventSource('/api/events?all=true')
+
+eventSource.addEventListener('open', () => {
+  console.log('Connected to SSE')
+})
+
+eventSource.addEventListener('error', (error) => {
+  if (eventSource.readyState === EventSource.CLOSED) {
+    console.log('SSE connection closed')
+  } else {
+    console.log('SSE connection error, will retry')
+  }
+})
+```
+
+### Manual Reconnection
+
+For more control:
+
+```javascript
+let eventSource = null
+
+function connect() {
+  eventSource = new EventSource('/api/events?all=true')
+  
+  eventSource.onmessage = (event) => {
+    const data = JSON.parse(event.data)
+    handleEvent(data)
+  }
+  
+  eventSource.onerror = () => {
+    eventSource.close()
+    setTimeout(connect, 5000)  // Retry after 5s
+  }
+}
+
+connect()
+```
+
+### Cleanup
+
+```javascript
+// Close connection when done
+eventSource.close()
+
+// Or on page unload
+window.addEventListener('beforeunload', () => {
+  eventSource.close()
+})
+```
+
+---
+
+## Filtering
+
+### Subscribe to All Events
+
+Receive all events in namespace:
+
+```javascript
+const eventSource = new EventSource('/api/events?all=true')
+```
+
+Use for:
+
+- Dashboard views
+- Session lists
+- Global notifications
+
+### Subscribe to Session
+
+Receive events for specific session:
+
+```javascript
+const eventSource = new EventSource('/api/events?sessionId=abc123')
+```
+
+Use for:
+
+- Session detail view
+- Chat interface
+- Session-specific updates
+
+### Subscribe to Machine
+
+Receive events for specific machine:
+
+```javascript
+const eventSource = new EventSource('/api/events?machineId=machine_xyz')
+```
+
+Use for:
+
+- Machine monitoring
+- Runner state tracking
+
+---
+
+## React Hook Example
+
+```typescript
+import { useEffect, useState } from 'react'
+import type { SyncEvent } from '@hapi/protocol'
+
+export function useSSE(token: string, sessionId?: string) {
+  const [events, setEvents] = useState<SyncEvent[]>([])
+  const [connected, setConnected] = useState(false)
+  
+  useEffect(() => {
+    const params = new URLSearchParams({
+      visibility: document.hidden ? 'hidden' : 'visible'
+    })
+    
+    if (sessionId) {
+      params.set('sessionId', sessionId)
+    } else {
+      params.set('all', 'true')
+    }
+    
+    const eventSource = new EventSource(
+      `/api/events?${params.toString()}`,
+      {
+        headers: { 'Authorization': 'Bearer ' + token }
+      }
+    )
+    
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data) as SyncEvent
+      
+      if (data.type === 'connection-changed') {
+        setConnected(data.data?.status === 'connected')
+      } else if (data.type !== 'heartbeat') {
+        setEvents((prev) => [...prev, data])
+      }
+    }
+    
+    eventSource.onerror = () => {
+      setConnected(false)
+    }
+    
+    return () => {
+      eventSource.close()
+    }
+  }, [token, sessionId])
+  
+  return { events, connected }
+}
+```
+
+**Usage:**
+
+```typescript
+function SessionView({ sessionId }: { sessionId: string }) {
+  const { events, connected } = useSSE(token, sessionId)
+  
+  useEffect(() => {
+    for (const event of events) {
+      if (event.type === 'message-received') {
+        // Handle new message
+      }
+    }
+  }, [events])
+  
+  return (
+    <div>
+      {connected ? 'Connected' : 'Connecting...'}
+      {/* ... */}
+    </div>
+  )
+}
+```
+
+---
+
+## SSE vs WebSocket
+
+### Use SSE When:
+
+- **Web clients** need real-time updates
+- **One-way** communication (server to client)
+- **Simple** integration with EventSource API
+- **Automatic** reconnection is desired
+
+### Use WebSocket (Socket.IO) When:
+
+- **CLI clients** need bidirectional communication
+- **Two-way** communication required
+- **RPC calls** needed
+- **Custom** protocols and events
+
+### Comparison
+
+| Feature | SSE | WebSocket |
+|---------|-----|----------|
+| Direction | Server → Client | Bidirectional |
+| API | EventSource | Socket.IO |
+| Auth | JWT in headers | Namespace in handshake |
+| Reconnection | Automatic | Configurable |
+| Use Case | Web updates | CLI communication |
+
+---
+
+## Browser Compatibility
+
+EventSource is supported in:
+
+- Chrome 6+
+- Firefox 6+
+- Safari 5+
+- Edge 79+
+- Opera 11+
+
+**Not supported:**
+
+- IE 11 (use polyfill or WebSocket)
+
+### Polyfill
+
+```javascript
+import { EventSourcePolyfill } from 'event-source-polyfill'
+
+const EventSource = window.EventSource || EventSourcePolyfill
+
+const eventSource = new EventSource('/api/events?all=true', {
+  headers: {
+    'Authorization': 'Bearer ' + token
+  }
+})
+```
